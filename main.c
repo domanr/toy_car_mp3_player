@@ -62,9 +62,8 @@
 #include "driverlib.h"
 #include "Board.h"
 
-uint16_t i;
-uint8_t RXData = 0, TXData = 0;
-uint8_t check = 0;
+char string[] = { "Bogi\n" };
+unsigned int i; //Counter
 
 void main(void)
 {
@@ -121,13 +120,6 @@ void main(void)
 
     EUSCI_A_UART_enable(EUSCI_A0_BASE);
 
-    EUSCI_A_UART_clearInterrupt(EUSCI_A0_BASE,
-        EUSCI_A_UART_RECEIVE_INTERRUPT);
-
-    // Enable USCI_A0 RX interrupt
-    EUSCI_A_UART_enableInterrupt(EUSCI_A0_BASE,
-        EUSCI_A_UART_RECEIVE_INTERRUPT);
-
     //Enter LPM0, enable interrupts
     __bis_SR_register(LPM0_bits + GIE);
     //For debugger
@@ -153,6 +145,14 @@ void EUSCI_A0_ISR(void)
     case USCI_UART_UCRXIFG:
         break;
     case USCI_UART_UCTXIFG:
+        if (i == sizeof string - 1)
+        {
+            EUSCI_A_UART_disableInterrupt(EUSCI_A0_BASE, EUSCI_A_UART_TRANSMIT_INTERRUPT);
+        }
+        else
+        {
+            EUSCI_A_UART_transmitData(EUSCI_A0_BASE, string[i++]);
+        }
         break;
     case USCI_UART_UCSTTIFG:
         break;
@@ -170,5 +170,7 @@ __attribute__((interrupt(WDT_VECTOR)))
 #endif
 void WDT_A_ISR (void)
 {
-    EUSCI_A_UART_transmitData(EUSCI_A0_BASE, 'B');
+    i = 0;
+    EUSCI_A_UART_enableInterrupt(EUSCI_A0_BASE, EUSCI_A_UART_TRANSMIT_INTERRUPT);
+    EUSCI_A_UART_transmitData(EUSCI_A0_BASE, string[i++]);
 }
