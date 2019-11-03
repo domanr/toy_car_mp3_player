@@ -65,34 +65,16 @@
 char string[] = { "Bogi\n" };
 unsigned int i; //Counter
 
+void WDT_Init(void);
+void Clock_Init(void);
+void GPIO_Init(void);
+void UART_Init(void);
+
 void main(void)
 {
-    WDT_A_initIntervalTimer(WDT_A_BASE, WDT_A_CLOCKSOURCE_SMCLK, WDT_A_CLOCKDIVIDER_512K);
-
-    WDT_A_start(WDT_A_BASE);
-
-    //Enable Watchdog Interupt
-    SFR_clearInterrupt(SFR_WATCHDOG_INTERVAL_TIMER_INTERRUPT);
-    SFR_enableInterrupt(SFR_WATCHDOG_INTERVAL_TIMER_INTERRUPT);
-
-    //Set ACLK = REFOCLK with clock divider of 1
-    CS_initClockSignal(CS_ACLK,CS_REFOCLK_SELECT,CS_CLOCK_DIVIDER_1);
-    //Set SMCLK = DCO with frequency divider of 1
-    CS_initClockSignal(CS_SMCLK,CS_DCOCLKDIV_SELECT,CS_CLOCK_DIVIDER_1);
-    //Set MCLK = DCO with frequency divider of 1
-    CS_initClockSignal(CS_MCLK,CS_DCOCLKDIV_SELECT,CS_CLOCK_DIVIDER_1);
-
-    //Configure UART pins
-    GPIO_setAsPeripheralModuleFunctionInputPin(
-        GPIO_PORT_UCA0TXD,
-        GPIO_PIN_UCA0TXD,
-        GPIO_FUNCTION_UCA0TXD
-    );
-    GPIO_setAsPeripheralModuleFunctionInputPin(
-        GPIO_PORT_UCA0RXD,
-        GPIO_PIN_UCA0RXD,
-        GPIO_FUNCTION_UCA0RXD
-    );
+    WDT_Init();
+    Clock_Init();
+    GPIO_Init();
 
     /*
      * Disable the GPIO power-on default high-impedance mode to activate
@@ -100,7 +82,41 @@ void main(void)
      */
     PMM_unlockLPM5();
 
-    //Configure UART
+    UART_Init();
+
+    //Enter LPM0, enable interrupts
+    __bis_SR_register(LPM0_bits + GIE);
+    //For debugger
+    __no_operation();
+}
+
+void WDT_Init(void)
+{
+    WDT_A_initIntervalTimer(WDT_A_BASE, WDT_A_CLOCKSOURCE_SMCLK, WDT_A_CLOCKDIVIDER_512K);
+    WDT_A_start(WDT_A_BASE);
+    SFR_clearInterrupt(SFR_WATCHDOG_INTERVAL_TIMER_INTERRUPT);
+    SFR_enableInterrupt(SFR_WATCHDOG_INTERVAL_TIMER_INTERRUPT);
+}
+
+void Clock_Init(void)
+{
+    //Set ACLK = REFOCLK with clock divider of 1
+    CS_initClockSignal(CS_ACLK,CS_REFOCLK_SELECT,CS_CLOCK_DIVIDER_1);
+    //Set SMCLK = DCO with frequency divider of 1
+    CS_initClockSignal(CS_SMCLK,CS_DCOCLKDIV_SELECT,CS_CLOCK_DIVIDER_1);
+    //Set MCLK = DCO with frequency divider of 1
+    CS_initClockSignal(CS_MCLK,CS_DCOCLKDIV_SELECT,CS_CLOCK_DIVIDER_1);
+}
+
+void GPIO_Init(void)
+{
+    //Configure UART pins
+    GPIO_setAsPeripheralModuleFunctionInputPin(GPIO_PORT_UCA0TXD, GPIO_PIN_UCA0TXD, GPIO_FUNCTION_UCA0TXD);
+    GPIO_setAsPeripheralModuleFunctionInputPin(GPIO_PORT_UCA0RXD, GPIO_PIN_UCA0RXD, GPIO_FUNCTION_UCA0RXD);
+}
+
+void UART_Init(void)
+{
     //SMCLK = 1MHz, Baudrate = 115200
     //UCBRx = 8, UCBRFx = 0, UCBRSx = 0xD6, UCOS16 = 0
     EUSCI_A_UART_initParam param = {0};
@@ -119,12 +135,8 @@ void main(void)
     }
 
     EUSCI_A_UART_enable(EUSCI_A0_BASE);
-
-    //Enter LPM0, enable interrupts
-    __bis_SR_register(LPM0_bits + GIE);
-    //For debugger
-    __no_operation();
 }
+
 //******************************************************************************
 //
 //This is the USCI_A0 interrupt vector service routine.
