@@ -64,14 +64,23 @@
 
 #define NULL 0
 
-char string[] = { "Bogi\n" };
-unsigned int i; //Counter
+class Serial
+{
+public:
+    char string[10];
+    unsigned int i;
+    Serial(void);
+    void init(void);
+    void puts(char*);
+};
 
 void WDT_Init(void);
 void Clock_Init(void);
 void GPIO_Init(void);
 void UART_Init(void);
 void UART_puts(void);
+
+Serial serial;
 
 void main(void)
 {
@@ -85,7 +94,7 @@ void main(void)
      */
     PMM_unlockLPM5();
 
-    UART_Init();
+    serial.init();
 
     //Enter LPM0, enable interrupts
     __bis_SR_register(LPM0_bits + GIE);
@@ -118,7 +127,7 @@ void GPIO_Init(void)
     GPIO_setAsPeripheralModuleFunctionInputPin(GPIO_PORT_UCA0RXD, GPIO_PIN_UCA0RXD, GPIO_FUNCTION_UCA0RXD);
 }
 
-void UART_Init(void)
+void Serial::init(void)
 {
     //SMCLK = 1MHz, Baudrate = 115200
     //UCBRx = 8, UCBRFx = 0, UCBRSx = 0xD6, UCOS16 = 0
@@ -140,12 +149,19 @@ void UART_Init(void)
     EUSCI_A_UART_enable(EUSCI_A0_BASE);
 }
 
-void UART_puts(void)
+void Serial::puts(char* input)
 {
+    i = 0;
+    do
+    {
+        string[i] = input[i];
+    } while (input[i++] != NULL);
     i = 0;
     EUSCI_A_UART_enableInterrupt(EUSCI_A0_BASE, EUSCI_A_UART_TRANSMIT_INTERRUPT);
     EUSCI_A_UART_transmitData(EUSCI_A0_BASE, string[i++]);
 }
+
+Serial::Serial(void) { }
 
 //******************************************************************************
 //
@@ -167,13 +183,13 @@ void EUSCI_A0_ISR(void)
     case USCI_UART_UCRXIFG:
         break;
     case USCI_UART_UCTXIFG:
-        if (string[i] == NULL)
+        if (serial.string[serial.i] == NULL)
         {
             EUSCI_A_UART_disableInterrupt(EUSCI_A0_BASE, EUSCI_A_UART_TRANSMIT_INTERRUPT);
         }
         else
         {
-            EUSCI_A_UART_transmitData(EUSCI_A0_BASE, string[i++]);
+            EUSCI_A_UART_transmitData(EUSCI_A0_BASE, serial.string[serial.i++]);
         }
         break;
     case USCI_UART_UCSTTIFG:
@@ -192,5 +208,5 @@ __attribute__((interrupt(WDT_VECTOR)))
 #endif
 void WDT_A_ISR (void)
 {
-    UART_puts();
+    serial.puts("Bogi\n");
 }
