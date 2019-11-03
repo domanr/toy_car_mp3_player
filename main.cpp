@@ -67,11 +67,12 @@
 class Serial
 {
 public:
-    char string[10];
-    unsigned int i;
+    static char string[10];
+    static unsigned int i;
     Serial(void);
     void init(void);
     void puts(char*);
+    static __interrupt void EUSCI_A0_ISR(void);
 };
 
 void WDT_Init(void);
@@ -127,6 +128,9 @@ void GPIO_Init(void)
     GPIO_setAsPeripheralModuleFunctionInputPin(GPIO_PORT_UCA0RXD, GPIO_PIN_UCA0RXD, GPIO_FUNCTION_UCA0RXD);
 }
 
+char Serial::string[10];
+unsigned int Serial::i;
+
 void Serial::init(void)
 {
     //SMCLK = 1MHz, Baudrate = 115200
@@ -174,7 +178,7 @@ __interrupt
 #elif defined(__GNUC__)
 __attribute__((interrupt(USCI_A0_VECTOR)))
 #endif
-void EUSCI_A0_ISR(void)
+void Serial::EUSCI_A0_ISR(void)
 {
     switch(__even_in_range(UCA0IV,USCI_UART_UCTXCPTIFG))
     {
@@ -183,13 +187,13 @@ void EUSCI_A0_ISR(void)
     case USCI_UART_UCRXIFG:
         break;
     case USCI_UART_UCTXIFG:
-        if (serial.string[serial.i] == NULL)
+        if (string[i] == NULL)
         {
             EUSCI_A_UART_disableInterrupt(EUSCI_A0_BASE, EUSCI_A_UART_TRANSMIT_INTERRUPT);
         }
         else
         {
-            EUSCI_A_UART_transmitData(EUSCI_A0_BASE, serial.string[serial.i++]);
+            EUSCI_A_UART_transmitData(EUSCI_A0_BASE, string[i++]);
         }
         break;
     case USCI_UART_UCSTTIFG:
