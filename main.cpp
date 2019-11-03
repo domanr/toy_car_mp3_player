@@ -172,13 +172,8 @@ Serial::Serial(void) { }
 //This is the USCI_A0 interrupt vector service routine.
 //
 //******************************************************************************
-#if defined(__TI_COMPILER_VERSION__) || defined(__IAR_SYSTEMS_ICC__)
 #pragma vector=USCI_A0_VECTOR
-__interrupt
-#elif defined(__GNUC__)
-__attribute__((interrupt(USCI_A0_VECTOR)))
-#endif
-void Serial::EUSCI_A0_ISR(void)
+__interrupt void Serial::EUSCI_A0_ISR(void)
 {
     switch(__even_in_range(UCA0IV,USCI_UART_UCTXCPTIFG))
     {
@@ -204,13 +199,8 @@ void Serial::EUSCI_A0_ISR(void)
 }
 
 //Watchdog Timer interrupt service routine
-#if defined(__TI_COMPILER_VERSION__) || defined(__IAR_SYSTEMS_ICC__)
 #pragma vector=WDT_VECTOR
-__interrupt
-#elif defined(__GNUC__)
-__attribute__((interrupt(WDT_VECTOR)))
-#endif
-void WDT_A_ISR (void)
+__interrupt void WDT_A_ISR (void)
 {
     serial.puts("Bogi\n");
 }
