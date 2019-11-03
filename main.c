@@ -62,6 +62,8 @@
 #include "driverlib.h"
 #include "Board.h"
 
+#define NULL 0
+
 char string[] = { "Bogi\n" };
 unsigned int i; //Counter
 
@@ -69,6 +71,7 @@ void WDT_Init(void);
 void Clock_Init(void);
 void GPIO_Init(void);
 void UART_Init(void);
+void UART_puts(void);
 
 void main(void)
 {
@@ -137,6 +140,13 @@ void UART_Init(void)
     EUSCI_A_UART_enable(EUSCI_A0_BASE);
 }
 
+void UART_puts(void)
+{
+    i = 0;
+    EUSCI_A_UART_enableInterrupt(EUSCI_A0_BASE, EUSCI_A_UART_TRANSMIT_INTERRUPT);
+    EUSCI_A_UART_transmitData(EUSCI_A0_BASE, string[i++]);
+}
+
 //******************************************************************************
 //
 //This is the USCI_A0 interrupt vector service routine.
@@ -157,7 +167,7 @@ void EUSCI_A0_ISR(void)
     case USCI_UART_UCRXIFG:
         break;
     case USCI_UART_UCTXIFG:
-        if (i == sizeof string - 1)
+        if (string[i] == NULL)
         {
             EUSCI_A_UART_disableInterrupt(EUSCI_A0_BASE, EUSCI_A_UART_TRANSMIT_INTERRUPT);
         }
@@ -182,7 +192,5 @@ __attribute__((interrupt(WDT_VECTOR)))
 #endif
 void WDT_A_ISR (void)
 {
-    i = 0;
-    EUSCI_A_UART_enableInterrupt(EUSCI_A0_BASE, EUSCI_A_UART_TRANSMIT_INTERRUPT);
-    EUSCI_A_UART_transmitData(EUSCI_A0_BASE, string[i++]);
+    UART_puts();
 }
