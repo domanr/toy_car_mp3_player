@@ -77,6 +77,9 @@
 //*****************************************************************************
 #define CS_MCLK_FLLREF_RATIO   30
 
+#define GPIO_PORT_MUSIC_BUTTON  GPIO_PORT_P1
+#define GPIO_PIN_MUSIC_BUTTON   GPIO_PIN6
+
 void WDT_Init(void);
 void Clock_Init(void);
 void GPIO_Init(void);
@@ -105,10 +108,8 @@ void main(void)
 
 void WDT_Init(void)
 {
-    WDT_A_initIntervalTimer(WDT_A_BASE, WDT_A_CLOCKSOURCE_SMCLK, WDT_A_CLOCKDIVIDER_512K);
-    WDT_A_start(WDT_A_BASE);
-    SFR_clearInterrupt(SFR_WATCHDOG_INTERVAL_TIMER_INTERRUPT);
-    SFR_enableInterrupt(SFR_WATCHDOG_INTERVAL_TIMER_INTERRUPT);
+    //Stop watchdog timer
+    WDT_A_hold(WDT_A_BASE);
 }
 
 void Clock_Init(void)
@@ -134,11 +135,36 @@ void GPIO_Init(void)
     //Configure UART pins
     GPIO_setAsPeripheralModuleFunctionInputPin(GPIO_PORT_UCA0TXD, GPIO_PIN_UCA0TXD, GPIO_FUNCTION_UCA0TXD);
     GPIO_setAsPeripheralModuleFunctionInputPin(GPIO_PORT_UCA0RXD, GPIO_PIN_UCA0RXD, GPIO_FUNCTION_UCA0RXD);
+
+    //Set LED1 to output direction
+    GPIO_setAsOutputPin(GPIO_PORT_LED1, GPIO_PIN_LED1);
+
+    //Enable S1 internal resistance as pull-Up resistance
+    GPIO_setAsInputPinWithPullUpResistor(GPIO_PORT_MUSIC_BUTTON, GPIO_PIN_MUSIC_BUTTON);
+
+    //S1 interrupt enabled
+    GPIO_enableInterrupt(GPIO_PORT_MUSIC_BUTTON, GPIO_PIN_MUSIC_BUTTON);
+
+    //S1 Hi/Lo edge
+    GPIO_selectInterruptEdge(GPIO_PORT_MUSIC_BUTTON, GPIO_PIN_MUSIC_BUTTON, GPIO_HIGH_TO_LOW_TRANSITION);
+
+    //S1 IFG cleared
+    GPIO_clearInterrupt(GPIO_PORT_MUSIC_BUTTON, GPIO_PIN_MUSIC_BUTTON);
 }
 
-//Watchdog Timer interrupt service routine
-#pragma vector=WDT_VECTOR
-__interrupt void WDT_A_ISR (void)
+//******************************************************************************
+//
+//This is the PORT1_VECTOR interrupt vector service routine
+//
+//******************************************************************************
+#pragma vector=PORT1_VECTOR
+__interrupt void P1_ISR (void)
 {
+    //LED1 = toggle
+    GPIO_toggleOutputOnPin(GPIO_PORT_LED1, GPIO_PIN_LED1);
+
     serial.puts("Bogica!\n");
+
+    //S1 IFG cleared
+    GPIO_clearInterrupt(GPIO_PORT_MUSIC_BUTTON, GPIO_PIN_MUSIC_BUTTON);
 }
