@@ -63,6 +63,20 @@
 #include "Board.h"
 #include "Serial.h"
 
+//*****************************************************************************
+//
+//Target frequency for MCLK in kHz
+//
+//*****************************************************************************
+#define CS_MCLK_DESIRED_FREQUENCY_IN_KHZ   1000
+
+//*****************************************************************************
+//
+//MCLK/FLLRef Ratio
+//
+//*****************************************************************************
+#define CS_MCLK_FLLREF_RATIO   30
+
 void WDT_Init(void);
 void Clock_Init(void);
 void GPIO_Init(void);
@@ -99,12 +113,20 @@ void WDT_Init(void)
 
 void Clock_Init(void)
 {
+    //Create struct variable to store proper software trim values
+    CS_initFLLParam param = {0};
+    //Set DCO FLL reference = REFO
+    CS_initClockSignal(CS_FLLREF, CS_REFOCLK_SELECT, CS_CLOCK_DIVIDER_1);
     //Set ACLK = REFOCLK with clock divider of 1
     CS_initClockSignal(CS_ACLK,CS_REFOCLK_SELECT,CS_CLOCK_DIVIDER_1);
-    //Set SMCLK = DCO with frequency divider of 1
-    CS_initClockSignal(CS_SMCLK,CS_DCOCLKDIV_SELECT,CS_CLOCK_DIVIDER_1);
-    //Set MCLK = DCO with frequency divider of 1
-    CS_initClockSignal(CS_MCLK,CS_DCOCLKDIV_SELECT,CS_CLOCK_DIVIDER_1);
+    //Set Ratio/Desired MCLK Frequency, initialize DCO, save trim values
+    CS_initFLLCalculateTrim(CS_MCLK_DESIRED_FREQUENCY_IN_KHZ, CS_MCLK_FLLREF_RATIO, &param);
+    //Clear all OSC fault flag
+    CS_clearAllOscFlagsWithTimeout(1000);
+    //Reload DCO trim values that were calculated earlier
+    CS_initFLLLoadTrim(CS_MCLK_DESIRED_FREQUENCY_IN_KHZ, CS_MCLK_FLLREF_RATIO, &param);
+    //Clear all OSC fault flag
+    CS_clearAllOscFlagsWithTimeout(1000);
 }
 
 void GPIO_Init(void)
