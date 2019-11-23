@@ -44,19 +44,66 @@ void DFPlayer::sendMsg(char* msg)
 
 void DFPlayer::next(void)
 {
-    //char buf[]
+    char message[DFPL_MSG_LEN] = {
+                                  DFPL_START_BYTE,
+                                  DFPL_VERSION,
+                                  DFPL_LEN, DFPL_CMD_NEXT,
+                                  DFPL_FEEDBACK_OFF,
+                                  DFPL_NO_DATA,
+                                  DFPL_NO_DATA,
+                                  GET_HIGH_BYTE(DFPL_CMD_CS_NO_FEEDBACK_NO_DATA(DFPL_CMD_NEXT)),
+                                  GET_LOW_BYTE(DFPL_CMD_CS_NO_FEEDBACK_NO_DATA(DFPL_CMD_NEXT)),
+                                  DFPL_END_BYTE
+    };
+    sendMsg(message);
 }
 
 void DFPlayer::previous(void)
 {
+    char message[DFPL_MSG_LEN] = {
+                                  DFPL_START_BYTE,
+                                  DFPL_VERSION,
+                                  DFPL_LEN, DFPL_CMD_PREV,
+                                  DFPL_FEEDBACK_OFF,
+                                  DFPL_NO_DATA,
+                                  DFPL_NO_DATA,
+                                  GET_HIGH_BYTE(DFPL_CMD_CS_NO_FEEDBACK_NO_DATA(DFPL_CMD_PREV)),
+                                  GET_LOW_BYTE(DFPL_CMD_CS_NO_FEEDBACK_NO_DATA(DFPL_CMD_PREV)),
+                                  DFPL_END_BYTE
+    };
+    sendMsg(message);
 }
 
 void DFPlayer::increaseVol(void)
 {
+    char message[DFPL_MSG_LEN] = {
+                                  DFPL_START_BYTE,
+                                  DFPL_VERSION,
+                                  DFPL_LEN, DFPL_CMD_INC_VOL,
+                                  DFPL_FEEDBACK_OFF,
+                                  DFPL_NO_DATA,
+                                  DFPL_NO_DATA,
+                                  GET_HIGH_BYTE(DFPL_CMD_CS_NO_FEEDBACK_NO_DATA(DFPL_CMD_INC_VOL)),
+                                  GET_LOW_BYTE(DFPL_CMD_CS_NO_FEEDBACK_NO_DATA(DFPL_CMD_INC_VOL)),
+                                  DFPL_END_BYTE
+    };
+    sendMsg(message);
 }
 
 void DFPlayer::decreaseVol(void)
 {
+    char message[DFPL_MSG_LEN] = {
+                                  DFPL_START_BYTE,
+                                  DFPL_VERSION,
+                                  DFPL_LEN, DFPL_CMD_DEC_VOL,
+                                  DFPL_FEEDBACK_OFF,
+                                  DFPL_NO_DATA,
+                                  DFPL_NO_DATA,
+                                  GET_HIGH_BYTE(DFPL_CMD_CS_NO_FEEDBACK_NO_DATA(DFPL_CMD_DEC_VOL)),
+                                  GET_LOW_BYTE(DFPL_CMD_CS_NO_FEEDBACK_NO_DATA(DFPL_CMD_DEC_VOL)),
+                                  DFPL_END_BYTE
+    };
+    sendMsg(message);
 }
 
 void DFPlayer::play(void)

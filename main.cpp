@@ -80,6 +80,10 @@
 
 #define GPIO_PORT_MUSIC_BUTTON  GPIO_PORT_P1
 #define GPIO_PIN_MUSIC_BUTTON   GPIO_PIN6
+#define GPIO_PORT_VOL_DOWN_BUTTON  GPIO_PORT_P2
+#define GPIO_PIN_VOL_DOWN_BUTTON   GPIO_PIN3
+#define GPIO_PORT_VOL_UP_BUTTON  GPIO_PORT_P2
+#define GPIO_PIN_VOL_UP_BUTTON   GPIO_PIN7
 
 void WDT_Init(void);
 void Clock_Init(void);
@@ -87,32 +91,6 @@ void GPIO_Init(void);
 
 Serial serial;
 DFPlayer dfplayer;
-
-char PlayCmd[DFPL_MSG_LEN] = {
-                  DFPL_START_BYTE,
-                  DFPL_VERSION,
-                  DFPL_LEN,
-                  DFPL_CMD_PLAY,
-                  DFPL_FEEDBACK_OFF,
-                  DFPL_NO_DATA,
-                  DFPL_NO_DATA,
-                  0xFE,
-                  0xEE,
-                  DFPL_END_BYTE
-};
-
-char PauseCmd[DFPL_MSG_LEN] = {
-                  DFPL_START_BYTE,
-                  DFPL_VERSION,
-                  DFPL_LEN,
-                  DFPL_CMD_PAUSE,
-                  DFPL_FEEDBACK_OFF,
-                  0,
-                  0,
-                  0xFE,
-                  0xED,
-                  DFPL_END_BYTE
-};
 
 void main(void)
 {
@@ -165,22 +143,27 @@ void GPIO_Init(void)
     GPIO_setAsPeripheralModuleFunctionInputPin(GPIO_PORT_UCA0TXD, GPIO_PIN_UCA0TXD, GPIO_FUNCTION_UCA0TXD);
     GPIO_setAsPeripheralModuleFunctionInputPin(GPIO_PORT_UCA0RXD, GPIO_PIN_UCA0RXD, GPIO_FUNCTION_UCA0RXD);
 
-    //Set LED1 to output direction
+    //Configure LED1
     GPIO_setAsOutputPin(GPIO_PORT_LED1, GPIO_PIN_LED1);
-
     GPIO_setOutputLowOnPin(GPIO_PORT_LED1, GPIO_PIN_LED1);
 
-    //Enable S1 internal resistance as pull-Up resistance
+    //Configure the music button
     GPIO_setAsInputPinWithPullUpResistor(GPIO_PORT_MUSIC_BUTTON, GPIO_PIN_MUSIC_BUTTON);
-
-    //S1 interrupt enabled
     GPIO_enableInterrupt(GPIO_PORT_MUSIC_BUTTON, GPIO_PIN_MUSIC_BUTTON);
-
-    //S1 Hi/Lo edge
     GPIO_selectInterruptEdge(GPIO_PORT_MUSIC_BUTTON, GPIO_PIN_MUSIC_BUTTON, GPIO_HIGH_TO_LOW_TRANSITION);
-
-    //S1 IFG cleared
     GPIO_clearInterrupt(GPIO_PORT_MUSIC_BUTTON, GPIO_PIN_MUSIC_BUTTON);
+
+    //Configure the volume down button
+    GPIO_setAsInputPinWithPullUpResistor(GPIO_PORT_VOL_DOWN_BUTTON, GPIO_PIN_VOL_DOWN_BUTTON);
+    GPIO_enableInterrupt(GPIO_PORT_VOL_DOWN_BUTTON, GPIO_PIN_VOL_DOWN_BUTTON);
+    GPIO_selectInterruptEdge(GPIO_PORT_VOL_DOWN_BUTTON, GPIO_PIN_VOL_DOWN_BUTTON, GPIO_HIGH_TO_LOW_TRANSITION);
+    GPIO_clearInterrupt(GPIO_PORT_VOL_DOWN_BUTTON, GPIO_PIN_VOL_DOWN_BUTTON);
+
+    //Configure the volume up button
+    GPIO_setAsInputPinWithPullUpResistor(GPIO_PORT_VOL_UP_BUTTON, GPIO_PIN_VOL_UP_BUTTON);
+    GPIO_enableInterrupt(GPIO_PORT_VOL_UP_BUTTON, GPIO_PIN_VOL_UP_BUTTON);
+    GPIO_selectInterruptEdge(GPIO_PORT_VOL_UP_BUTTON, GPIO_PIN_VOL_UP_BUTTON, GPIO_HIGH_TO_LOW_TRANSITION);
+    GPIO_clearInterrupt(GPIO_PORT_VOL_UP_BUTTON, GPIO_PIN_VOL_UP_BUTTON);
 }
 
 //******************************************************************************
@@ -210,4 +193,23 @@ __interrupt void P1_ISR (void)
 
     //S1 IFG cleared
     GPIO_clearInterrupt(GPIO_PORT_MUSIC_BUTTON, GPIO_PIN_MUSIC_BUTTON);
+}
+
+//******************************************************************************
+//
+//This is the PORT2_VECTOR interrupt vector service routine
+//
+//******************************************************************************
+#pragma vector=PORT2_VECTOR
+__interrupt void P2_ISR (void)
+{
+    if (GPIO_getInterruptStatus (GPIO_PORT_VOL_DOWN_BUTTON, GPIO_PIN_VOL_DOWN_BUTTON)) {
+        dfplayer.decreaseVol();
+        GPIO_clearInterrupt(GPIO_PORT_VOL_DOWN_BUTTON, GPIO_PIN_VOL_DOWN_BUTTON);
+    }
+
+    if (GPIO_getInterruptStatus (GPIO_PORT_VOL_UP_BUTTON, GPIO_PIN_VOL_UP_BUTTON)) {
+        dfplayer.increaseVol();
+        GPIO_clearInterrupt(GPIO_PORT_VOL_UP_BUTTON, GPIO_PIN_VOL_UP_BUTTON);
+    }
 }
