@@ -45,6 +45,11 @@ void Serial::puts(char* input)
     EUSCI_A_UART_transmitData(EUSCI_A0_BASE, string[i++]);
 }
 
+void Serial::send(char c)
+{
+    EUSCI_A_UART_transmitData(EUSCI_A0_BASE, c);
+}
+
 Serial::Serial(void) { }
 
 //******************************************************************************

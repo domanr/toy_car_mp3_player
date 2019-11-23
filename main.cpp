@@ -80,11 +80,57 @@
 #define GPIO_PORT_MUSIC_BUTTON  GPIO_PORT_P1
 #define GPIO_PIN_MUSIC_BUTTON   GPIO_PIN6
 
+#define DFPL_MSG_LEN        10
+
+#define DFPL_START_BYTE     0x7E
+#define DFPL_VERSION        0xFF
+#define DFPL_LEN            0x06
+#define DFPL_FEEDBACK_ON    0x01
+#define DFPL_FEEDBACK_OFF   0x00
+#define DFPL_END_BYTE       0xEF
+
+#define DFPL_CMD_PLAY       0x0D
+#define DFPL_CMD_PAUSE      0x0E
+
+typedef enum {
+    RUNNING,
+    STOPPED
+} PlayingStatus_t;
+
 void WDT_Init(void);
 void Clock_Init(void);
 void GPIO_Init(void);
+void SendMsg(char* msg);
 
 Serial serial;
+
+PlayingStatus_t PlayingStatus = STOPPED;
+
+char PlayCmd[DFPL_MSG_LEN] = {
+                  DFPL_START_BYTE,
+                  DFPL_VERSION,
+                  DFPL_LEN,
+                  DFPL_CMD_PLAY,
+                  DFPL_FEEDBACK_OFF,
+                  0,
+                  0,
+                  0xFE,
+                  0xEE,
+                  DFPL_END_BYTE
+};
+
+char PauseCmd[DFPL_MSG_LEN] = {
+                  DFPL_START_BYTE,
+                  DFPL_VERSION,
+                  DFPL_LEN,
+                  DFPL_CMD_PAUSE,
+                  DFPL_FEEDBACK_OFF,
+                  0,
+                  0,
+                  0xFE,
+                  0xED,
+                  DFPL_END_BYTE
+};
 
 void main(void)
 {
@@ -139,6 +185,8 @@ void GPIO_Init(void)
     //Set LED1 to output direction
     GPIO_setAsOutputPin(GPIO_PORT_LED1, GPIO_PIN_LED1);
 
+    GPIO_setOutputLowOnPin(GPIO_PORT_LED1, GPIO_PIN_LED1);
+
     //Enable S1 internal resistance as pull-Up resistance
     GPIO_setAsInputPinWithPullUpResistor(GPIO_PORT_MUSIC_BUTTON, GPIO_PIN_MUSIC_BUTTON);
 
@@ -152,6 +200,15 @@ void GPIO_Init(void)
     GPIO_clearInterrupt(GPIO_PORT_MUSIC_BUTTON, GPIO_PIN_MUSIC_BUTTON);
 }
 
+void SendMsg(char* msg)
+{
+    int i = 0;
+    for(i=0; i < DFPL_MSG_LEN; i++)
+    {
+        serial.send(msg[i]);
+    }
+}
+
 //******************************************************************************
 //
 //This is the PORT1_VECTOR interrupt vector service routine
@@ -163,7 +220,20 @@ __interrupt void P1_ISR (void)
     //LED1 = toggle
     GPIO_toggleOutputOnPin(GPIO_PORT_LED1, GPIO_PIN_LED1);
 
-    serial.puts("Bogica!\n");
+    switch(PlayingStatus)
+    {
+    case STOPPED:
+        SendMsg(PlayCmd);
+        PlayingStatus = RUNNING;
+        break;
+    case RUNNING:
+        SendMsg(PauseCmd);
+        PlayingStatus = STOPPED;
+        break;
+    default:
+        break;
+    }
+
 
     //S1 IFG cleared
     GPIO_clearInterrupt(GPIO_PORT_MUSIC_BUTTON, GPIO_PIN_MUSIC_BUTTON);

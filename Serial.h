@@ -18,6 +18,7 @@ public:
     Serial(void);
     void init(void);
     void puts(char*);
+    void send(char);
     static __interrupt void EUSCI_A0_ISR(void);
 };
 
