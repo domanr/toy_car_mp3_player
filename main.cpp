@@ -62,6 +62,7 @@
 #include "driverlib.h"
 #include "Board.h"
 #include "Serial.h"
+#include "DFPlayer.h"
 
 //*****************************************************************************
 //
@@ -80,31 +81,12 @@
 #define GPIO_PORT_MUSIC_BUTTON  GPIO_PORT_P1
 #define GPIO_PIN_MUSIC_BUTTON   GPIO_PIN6
 
-#define DFPL_MSG_LEN        10
-
-#define DFPL_START_BYTE     0x7E
-#define DFPL_VERSION        0xFF
-#define DFPL_LEN            0x06
-#define DFPL_FEEDBACK_ON    0x01
-#define DFPL_FEEDBACK_OFF   0x00
-#define DFPL_END_BYTE       0xEF
-
-#define DFPL_CMD_PLAY       0x0D
-#define DFPL_CMD_PAUSE      0x0E
-
-typedef enum {
-    RUNNING,
-    STOPPED
-} PlayingStatus_t;
-
 void WDT_Init(void);
 void Clock_Init(void);
 void GPIO_Init(void);
-void SendMsg(char* msg);
 
 Serial serial;
-
-PlayingStatus_t PlayingStatus = STOPPED;
+DFPlayer dfplayer;
 
 char PlayCmd[DFPL_MSG_LEN] = {
                   DFPL_START_BYTE,
@@ -112,8 +94,8 @@ char PlayCmd[DFPL_MSG_LEN] = {
                   DFPL_LEN,
                   DFPL_CMD_PLAY,
                   DFPL_FEEDBACK_OFF,
-                  0,
-                  0,
+                  DFPL_NO_DATA,
+                  DFPL_NO_DATA,
                   0xFE,
                   0xEE,
                   DFPL_END_BYTE
@@ -145,6 +127,7 @@ void main(void)
     PMM_unlockLPM5();
 
     serial.init();
+    dfplayer.setSerial(serial);
 
     //Enter LPM0, enable interrupts
     __bis_SR_register(LPM0_bits + GIE);
@@ -200,15 +183,6 @@ void GPIO_Init(void)
     GPIO_clearInterrupt(GPIO_PORT_MUSIC_BUTTON, GPIO_PIN_MUSIC_BUTTON);
 }
 
-void SendMsg(char* msg)
-{
-    int i = 0;
-    for(i=0; i < DFPL_MSG_LEN; i++)
-    {
-        serial.send(msg[i]);
-    }
-}
-
 //******************************************************************************
 //
 //This is the PORT1_VECTOR interrupt vector service routine
@@ -220,20 +194,19 @@ __interrupt void P1_ISR (void)
     //LED1 = toggle
     GPIO_toggleOutputOnPin(GPIO_PORT_LED1, GPIO_PIN_LED1);
 
-    switch(PlayingStatus)
+    switch(dfplayer.getPlayingStatus())
     {
-    case STOPPED:
-        SendMsg(PlayCmd);
-        PlayingStatus = RUNNING;
+    case DFPL_STATUS_PAUSED:
+        dfplayer.play();
+        dfplayer.setPlayingStatus(DFPL_STATUS_PLAYING);
         break;
-    case RUNNING:
-        SendMsg(PauseCmd);
-        PlayingStatus = STOPPED;
+    case DFPL_STATUS_PLAYING:
+        dfplayer.pause();
+        dfplayer.setPlayingStatus(DFPL_STATUS_PAUSED);
         break;
     default:
         break;
     }
-
 
     //S1 IFG cleared
     GPIO_clearInterrupt(GPIO_PORT_MUSIC_BUTTON, GPIO_PIN_MUSIC_BUTTON);
