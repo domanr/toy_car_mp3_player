@@ -78,16 +78,31 @@
 //*****************************************************************************
 #define CS_MCLK_FLLREF_RATIO   30
 
-#define GPIO_PORT_MUSIC_BUTTON  GPIO_PORT_P1
-#define GPIO_PIN_MUSIC_BUTTON   GPIO_PIN6
-#define GPIO_PORT_VOL_DOWN_BUTTON  GPIO_PORT_P2
-#define GPIO_PIN_VOL_DOWN_BUTTON   GPIO_PIN3
-#define GPIO_PORT_VOL_UP_BUTTON  GPIO_PORT_P2
-#define GPIO_PIN_VOL_UP_BUTTON   GPIO_PIN7
+#define BUTTON_VOL_DOWN_PORT    GPIO_PORT_P2
+#define BUTTON_VOL_DOWN_PIN     GPIO_PIN3
+
+#define BUTTON_RIGHT_PORT       GPIO_PORT_P1
+#define BUTTON_RIGHT_PIN        GPIO_PIN2
+
+#define BUTTON_LEFT_PORT        GPIO_PORT_P2
+#define BUTTON_LEFT_PIN         GPIO_PIN4
+
+#define BUTTON_MUSIC_PORT       GPIO_PORT_P2
+#define BUTTON_MUSIC_PIN        GPIO_PIN7
+
+#define BUTTON_HORN_PORT        GPIO_PORT_P1
+#define BUTTON_HORN_PIN         GPIO_PIN3
 
 void WDT_Init(void);
 void Clock_Init(void);
 void GPIO_Init(void);
+void ConfigureButton(uint8_t port, uint16_t pin);
+
+void ButtonVolDownHandler(void);
+void ButtonLeftHandler(void);
+void ButtonRightHandler(void);
+void ButtonMusicHandler(void);
+void ButtonHornHandler(void);
 
 Serial serial;
 DFPlayer dfplayer;
@@ -147,23 +162,33 @@ void GPIO_Init(void)
     GPIO_setAsOutputPin(GPIO_PORT_LED1, GPIO_PIN_LED1);
     GPIO_setOutputLowOnPin(GPIO_PORT_LED1, GPIO_PIN_LED1);
 
+    //Configure LED2
+    GPIO_setAsOutputPin(GPIO_PORT_LED2, GPIO_PIN_LED2);
+    GPIO_setOutputLowOnPin(GPIO_PORT_LED2, GPIO_PIN_LED2);
+
     //Configure the music button
-    GPIO_setAsInputPinWithPullUpResistor(GPIO_PORT_MUSIC_BUTTON, GPIO_PIN_MUSIC_BUTTON);
-    GPIO_enableInterrupt(GPIO_PORT_MUSIC_BUTTON, GPIO_PIN_MUSIC_BUTTON);
-    GPIO_selectInterruptEdge(GPIO_PORT_MUSIC_BUTTON, GPIO_PIN_MUSIC_BUTTON, GPIO_HIGH_TO_LOW_TRANSITION);
-    GPIO_clearInterrupt(GPIO_PORT_MUSIC_BUTTON, GPIO_PIN_MUSIC_BUTTON);
+    ConfigureButton(BUTTON_MUSIC_PORT, BUTTON_MUSIC_PIN);
+
+    //Configure the left button
+    ConfigureButton(BUTTON_LEFT_PORT, BUTTON_LEFT_PIN);
+
+    //Configure the right button
+    ConfigureButton(BUTTON_RIGHT_PORT, BUTTON_RIGHT_PIN);
+
+    //Configure the horn button
+    ConfigureButton(BUTTON_HORN_PORT, BUTTON_HORN_PIN);
 
     //Configure the volume down button
-    GPIO_setAsInputPinWithPullUpResistor(GPIO_PORT_VOL_DOWN_BUTTON, GPIO_PIN_VOL_DOWN_BUTTON);
-    GPIO_enableInterrupt(GPIO_PORT_VOL_DOWN_BUTTON, GPIO_PIN_VOL_DOWN_BUTTON);
-    GPIO_selectInterruptEdge(GPIO_PORT_VOL_DOWN_BUTTON, GPIO_PIN_VOL_DOWN_BUTTON, GPIO_HIGH_TO_LOW_TRANSITION);
-    GPIO_clearInterrupt(GPIO_PORT_VOL_DOWN_BUTTON, GPIO_PIN_VOL_DOWN_BUTTON);
+    ConfigureButton(BUTTON_VOL_DOWN_PORT, BUTTON_VOL_DOWN_PIN);
+}
 
-    //Configure the volume up button
-    GPIO_setAsInputPinWithPullUpResistor(GPIO_PORT_VOL_UP_BUTTON, GPIO_PIN_VOL_UP_BUTTON);
-    GPIO_enableInterrupt(GPIO_PORT_VOL_UP_BUTTON, GPIO_PIN_VOL_UP_BUTTON);
-    GPIO_selectInterruptEdge(GPIO_PORT_VOL_UP_BUTTON, GPIO_PIN_VOL_UP_BUTTON, GPIO_HIGH_TO_LOW_TRANSITION);
-    GPIO_clearInterrupt(GPIO_PORT_VOL_UP_BUTTON, GPIO_PIN_VOL_UP_BUTTON);
+void ConfigureButton(uint8_t port, uint16_t pin)
+{
+    //Configure the music button
+    GPIO_setAsInputPinWithPullUpResistor(port, pin);
+    GPIO_enableInterrupt(port, pin);
+    GPIO_selectInterruptEdge(port, pin, GPIO_HIGH_TO_LOW_TRANSITION);
+    GPIO_clearInterrupt(port, pin);
 }
 
 //******************************************************************************
@@ -174,25 +199,8 @@ void GPIO_Init(void)
 #pragma vector=PORT1_VECTOR
 __interrupt void P1_ISR (void)
 {
-    //LED1 = toggle
-    GPIO_toggleOutputOnPin(GPIO_PORT_LED1, GPIO_PIN_LED1);
-
-    switch(dfplayer.getPlayingStatus())
-    {
-    case DFPL_STATUS_PAUSED:
-        dfplayer.play();
-        dfplayer.setPlayingStatus(DFPL_STATUS_PLAYING);
-        break;
-    case DFPL_STATUS_PLAYING:
-        dfplayer.pause();
-        dfplayer.setPlayingStatus(DFPL_STATUS_PAUSED);
-        break;
-    default:
-        break;
-    }
-
-    //S1 IFG cleared
-    GPIO_clearInterrupt(GPIO_PORT_MUSIC_BUTTON, GPIO_PIN_MUSIC_BUTTON);
+    ButtonHornHandler();
+    ButtonRightHandler();
 }
 
 //******************************************************************************
@@ -203,13 +211,61 @@ __interrupt void P1_ISR (void)
 #pragma vector=PORT2_VECTOR
 __interrupt void P2_ISR (void)
 {
-    if (GPIO_getInterruptStatus (GPIO_PORT_VOL_DOWN_BUTTON, GPIO_PIN_VOL_DOWN_BUTTON)) {
-        dfplayer.decreaseVol();
-        GPIO_clearInterrupt(GPIO_PORT_VOL_DOWN_BUTTON, GPIO_PIN_VOL_DOWN_BUTTON);
-    }
+    ButtonVolDownHandler();
+    ButtonMusicHandler();
+    ButtonLeftHandler();
+}
 
-    if (GPIO_getInterruptStatus (GPIO_PORT_VOL_UP_BUTTON, GPIO_PIN_VOL_UP_BUTTON)) {
+void ButtonVolDownHandler(void)
+{
+    if (GPIO_getInterruptStatus (BUTTON_VOL_DOWN_PORT, BUTTON_VOL_DOWN_PIN)) {
+        dfplayer.decreaseVol();
+        GPIO_clearInterrupt(BUTTON_VOL_DOWN_PORT, BUTTON_VOL_DOWN_PIN);
+    }
+}
+
+void ButtonLeftHandler(void)
+{
+    if (GPIO_getInterruptStatus (BUTTON_LEFT_PORT, BUTTON_LEFT_PIN)) {
+        dfplayer.previous();
+        GPIO_toggleOutputOnPin(GPIO_PORT_LED1, GPIO_PIN_LED1);
+        GPIO_clearInterrupt(BUTTON_LEFT_PORT, BUTTON_LEFT_PIN);
+    }
+}
+
+void ButtonRightHandler(void)
+{
+    if (GPIO_getInterruptStatus (BUTTON_RIGHT_PORT, BUTTON_RIGHT_PIN)) {
+        dfplayer.next();
+        GPIO_toggleOutputOnPin(GPIO_PORT_LED2, GPIO_PIN_LED2);
+        GPIO_clearInterrupt(BUTTON_RIGHT_PORT, BUTTON_RIGHT_PIN);
+    }
+}
+
+void ButtonMusicHandler(void)
+{
+    if (GPIO_getInterruptStatus (BUTTON_MUSIC_PORT, BUTTON_MUSIC_PIN)) {
+        switch(dfplayer.getPlayingStatus())
+        {
+        case DFPL_STATUS_PAUSED:
+            dfplayer.play();
+            dfplayer.setPlayingStatus(DFPL_STATUS_PLAYING);
+            break;
+        case DFPL_STATUS_PLAYING:
+            dfplayer.pause();
+            dfplayer.setPlayingStatus(DFPL_STATUS_PAUSED);
+            break;
+        default:
+            break;
+        }
+        GPIO_clearInterrupt(BUTTON_MUSIC_PORT, BUTTON_MUSIC_PIN);
+    }
+}
+
+void ButtonHornHandler(void)
+{
+    if (GPIO_getInterruptStatus (BUTTON_HORN_PORT, BUTTON_HORN_PIN)) {
         dfplayer.increaseVol();
-        GPIO_clearInterrupt(GPIO_PORT_VOL_UP_BUTTON, GPIO_PIN_VOL_UP_BUTTON);
+        GPIO_clearInterrupt(BUTTON_HORN_PORT, BUTTON_HORN_PIN);
     }
 }
