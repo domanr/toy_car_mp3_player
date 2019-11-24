@@ -107,6 +107,8 @@ void ButtonHornHandler(void);
 Serial serial;
 DFPlayer dfplayer;
 
+uint16_t systemCounter = 0;
+
 void main(void)
 {
     WDT_Init();
@@ -130,8 +132,10 @@ void main(void)
 
 void WDT_Init(void)
 {
-    //Stop watchdog timer
-    WDT_A_hold(WDT_A_BASE);
+    WDT_A_initIntervalTimer(WDT_A_BASE, WDT_A_CLOCKSOURCE_ACLK, WDT_A_CLOCKDIVIDER_32K);
+    WDT_A_start(WDT_A_BASE);
+    SFR_clearInterrupt(SFR_WATCHDOG_INTERVAL_TIMER_INTERRUPT);
+    SFR_enableInterrupt(SFR_WATCHDOG_INTERVAL_TIMER_INTERRUPT);
 }
 
 void Clock_Init(void)
@@ -216,6 +220,18 @@ __interrupt void P2_ISR (void)
     ButtonLeftHandler();
 }
 
+//Watchdog Timer interrupt service routine
+#pragma vector=WDT_VECTOR
+__interrupt void WDT_A_ISR (void)
+{
+    systemCounter++;
+
+    if(systemCounter == 3)
+    {
+        dfplayer.setVol(10);
+    }
+}
+
 void ButtonVolDownHandler(void)
 {
     if (GPIO_getInterruptStatus (BUTTON_VOL_DOWN_PORT, BUTTON_VOL_DOWN_PIN)) {
@@ -228,7 +244,6 @@ void ButtonLeftHandler(void)
 {
     if (GPIO_getInterruptStatus (BUTTON_LEFT_PORT, BUTTON_LEFT_PIN)) {
         dfplayer.previous();
-        GPIO_toggleOutputOnPin(GPIO_PORT_LED1, GPIO_PIN_LED1);
         GPIO_clearInterrupt(BUTTON_LEFT_PORT, BUTTON_LEFT_PIN);
     }
 }
@@ -237,7 +252,6 @@ void ButtonRightHandler(void)
 {
     if (GPIO_getInterruptStatus (BUTTON_RIGHT_PORT, BUTTON_RIGHT_PIN)) {
         dfplayer.next();
-        GPIO_toggleOutputOnPin(GPIO_PORT_LED2, GPIO_PIN_LED2);
         GPIO_clearInterrupt(BUTTON_RIGHT_PORT, BUTTON_RIGHT_PIN);
     }
 }
