@@ -265,7 +265,7 @@ void ButtonMusicHandler(void)
 void ButtonHornHandler(void)
 {
     if (GPIO_getInterruptStatus (BUTTON_HORN_PORT, BUTTON_HORN_PIN)) {
-        dfplayer.increaseVol();
+        dfplayer.playAdvertisment();
         GPIO_clearInterrupt(BUTTON_HORN_PORT, BUTTON_HORN_PIN);
     }
 }

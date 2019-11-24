@@ -38,11 +38,16 @@ enum {
     DFPL_CMD_PAUSE,
     DFPL_CMD_FOLDER,
     DFPL_CMD_VOL_ADJ_SET,
-    DFPL_CMD_REPEAT
+    DFPL_CMD_REPEAT,
+    DFPL_CMD_PLAY_FOLDER_TRACK,
+    DFPL_CMD_PLAY_ADV,
+    DFPL_CMD_PLAY_FOLDER_TRACK_16,
+    DFPL_CMD_STOP_ADV
 };
 #define GET_HIGH_BYTE(word) (uint8_t(((word) & 0xFF00) >> 8))
 #define GET_LOW_BYTE(word) (uint8_t((word) & 0x00FF))
 #define DFPL_CMD_CS_NO_FEEDBACK_NO_DATA(cmd) (0x10000 - (DFPL_VERSION + DFPL_LEN + (cmd)))
+#define DFPL_CMD_CS_NO_FEEDBACK(cmd, data) (0x10000 - (DFPL_VERSION + DFPL_LEN + (data) + (cmd)))
 
 typedef enum {
     DFPL_STATUS_PLAYING,
@@ -79,7 +84,7 @@ public:
     void specifyFolder(uint8_t folder);
     void volumeAdjustSet(uint8_t openVolAdj, uint8_t volGain);
     void repeatPlay(uint8_t repeatOnOff);
-
+    void playAdvertisment(void);
 };
 
 #endif /* DFPLAYER_H_ */

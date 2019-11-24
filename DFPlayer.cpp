@@ -137,3 +137,18 @@ void DFPlayer::pause(void)
     };
     sendMsg(message);
 }
+
+void DFPlayer::playAdvertisment(void)
+{
+    char message[DFPL_MSG_LEN] = {
+            DFPL_START_BYTE,
+            DFPL_VERSION,
+            DFPL_LEN, DFPL_CMD_PLAY_ADV,
+            DFPL_FEEDBACK_OFF,
+            DFPL_NO_DATA,
+            0x01,
+            GET_HIGH_BYTE(DFPL_CMD_CS_NO_FEEDBACK(DFPL_CMD_PLAY_ADV, 0x01)),
+            GET_LOW_BYTE(DFPL_CMD_CS_NO_FEEDBACK(DFPL_CMD_PLAY_ADV, 0x01)),
+            DFPL_END_BYTE };
+    sendMsg(message);
+}
