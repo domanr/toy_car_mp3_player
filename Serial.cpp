@@ -10,8 +10,12 @@
 
 char Serial::string[10];
 unsigned int Serial::i;
+uint8_t Serial::SerialBuffer[BUFFER_SIZE];
+uint8_t Serial::ReadPosition;
+uint8_t Serial::WritePosition;
+void (*Serial::UpperLayerCallout)() = NULL;
 
-void Serial::init(void)
+void Serial::init(void (*pULNotificationCallout)(void))
 {
     //SMCLK = 1MHz, Baudrate = 115200
     //UCBRx = 8, UCBRFx = 0, UCBRSx = 0xD6, UCOS16 = 0
@@ -29,6 +33,11 @@ void Serial::init(void)
     if (STATUS_FAIL == EUSCI_A_UART_init(EUSCI_A0_BASE, &param)) {
         return;
     }
+
+    WritePosition = 0;
+    ReadPosition = 0;
+
+    UpperLayerCallout = pULNotificationCallout;
 
     EUSCI_A_UART_enable(EUSCI_A0_BASE);
 }
@@ -58,6 +67,24 @@ Serial::Serial(void) { }
 //
 //******************************************************************************
 #pragma vector=USCI_A0_VECTOR
+
+CbReadReturnType Serial::SerialPortRead(uint8_t* data)
+{
+    if(ReadPosition == WritePosition)
+    {
+        return eErrorBufferEmpty;
+    }
+
+    *data = SerialBuffer[ReadPosition];
+    ReadPosition = (ReadPosition + 1) % BUFFER_SIZE;
+    return eReadOK;
+}
+
+uint8_t Serial::GetBufferLength(void)
+{
+    return((WritePosition - ReadPosition) & (BUFFER_SIZE-1));
+}
+
 __interrupt void Serial::EUSCI_A0_ISR(void)
 {
     switch(__even_in_range(UCA0IV,USCI_UART_UCTXCPTIFG))
@@ -65,6 +92,16 @@ __interrupt void Serial::EUSCI_A0_ISR(void)
     case USCI_NONE:
         break;
     case USCI_UART_UCRXIFG:
+        if(GetBufferLength() == BUFFER_SIZE-1)
+        {
+            return;
+        }
+        SerialBuffer[WritePosition] = EUSCI_A_UART_receiveData(EUSCI_A0_BASE);
+        WritePosition = (WritePosition + 1) % BUFFER_SIZE;
+        if(NULL != UpperLayerCallout)
+        {
+            UpperLayerCallout();
+        }
         break;
     case USCI_UART_UCTXIFG:
         if (string[i] == NULL)

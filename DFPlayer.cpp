@@ -15,7 +15,12 @@ DFPlayer::DFPlayer()
 
 uint16_t DFPlayer::calculateCheckSum(char* buf)
 {
-    return 0x0000;
+    uint16_t sum = 0;
+    for(uint8_t i = 1; i < DFPL_CS_CALC_LEN; i++)
+    {
+        sum += buf[i];
+    }
+    return -sum;
 }
 
 void DFPlayer::setSerial(Serial &s)
@@ -143,14 +148,21 @@ void DFPlayer::setVol(uint8_t vol)
     char message[DFPL_MSG_LEN] = {
             DFPL_START_BYTE,
             DFPL_VERSION,
-            DFPL_LEN, DFPL_CMD_SET_VOL,
+            DFPL_LEN,
+            DFPL_CMD_SET_VOL,
             DFPL_FEEDBACK_OFF,
             DFPL_NO_DATA,
-            10,
-            GET_HIGH_BYTE(DFPL_CMD_CS_NO_FEEDBACK(DFPL_CMD_SET_VOL, 10)),
-            GET_LOW_BYTE(DFPL_CMD_CS_NO_FEEDBACK(DFPL_CMD_SET_VOL, 10)),
+            0,
+            0,
+            0,
             DFPL_END_BYTE
     };
+    uint16_t cs;
+
+    message[DFPL_POS_DATA2] = vol;
+    cs = calculateCheckSum(message);
+    message[DFPL_POS_CS_HIGH] = GET_HIGH_BYTE(cs);
+    message[DFPL_POS_CS_LOW] = GET_LOW_BYTE(cs);
     sendMsg(message);
 }
 
@@ -165,6 +177,41 @@ void DFPlayer::playAdvertisment(void)
             0x01,
             GET_HIGH_BYTE(DFPL_CMD_CS_NO_FEEDBACK(DFPL_CMD_PLAY_ADV, 0x01)),
             GET_LOW_BYTE(DFPL_CMD_CS_NO_FEEDBACK(DFPL_CMD_PLAY_ADV, 0x01)),
+            DFPL_END_BYTE };
+    sendMsg(message);
+}
+
+Init_t DFPlayer::getInitStatus() const
+{
+    return initStatus;
+}
+
+void DFPlayer::setInitStatus(Init_t status)
+{
+    this->initStatus = status;
+}
+
+ResponseStatus_t DFPlayer::getResponseStatus() const
+{
+    return responseStatus;
+}
+
+void DFPlayer::setResponseStatus(ResponseStatus_t status)
+{
+    this->responseStatus = status;
+}
+
+void DFPlayer::startup(void)
+{
+    char message[DFPL_MSG_LEN] = {
+            DFPL_START_BYTE,
+            DFPL_VERSION,
+            DFPL_LEN, DFPL_CMD_PLAY_ADV,
+            DFPL_FEEDBACK_OFF,
+            DFPL_NO_DATA,
+            0x02,
+            GET_HIGH_BYTE(DFPL_CMD_CS_NO_FEEDBACK(DFPL_CMD_PLAY_ADV, 0x02)),
+            GET_LOW_BYTE(DFPL_CMD_CS_NO_FEEDBACK(DFPL_CMD_PLAY_ADV, 0x02)),
             DFPL_END_BYTE };
     sendMsg(message);
 }

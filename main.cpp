@@ -93,6 +93,8 @@
 #define BUTTON_HORN_PORT        GPIO_PORT_P1
 #define BUTTON_HORN_PIN         GPIO_PIN3
 
+#define DEFAULT_VOLUME          15
+
 void WDT_Init(void);
 void Clock_Init(void);
 void GPIO_Init(void);
@@ -103,6 +105,8 @@ void ButtonLeftHandler(void);
 void ButtonRightHandler(void);
 void ButtonMusicHandler(void);
 void ButtonHornHandler(void);
+
+void DataReceivedHandler(void);
 
 Serial serial;
 DFPlayer dfplayer;
@@ -121,7 +125,7 @@ void main(void)
      */
     PMM_unlockLPM5();
 
-    serial.init();
+    serial.init(&DataReceivedHandler);
     dfplayer.setSerial(serial);
 
     //Enter LPM0, enable interrupts
@@ -132,7 +136,8 @@ void main(void)
 
 void WDT_Init(void)
 {
-    WDT_A_initIntervalTimer(WDT_A_BASE, WDT_A_CLOCKSOURCE_ACLK, WDT_A_CLOCKDIVIDER_32K);
+    //ACLK / 512 ==> cycle time = 15.625 ms
+    WDT_A_initIntervalTimer(WDT_A_BASE, WDT_A_CLOCKSOURCE_ACLK, WDT_A_CLOCKDIVIDER_512);
     WDT_A_start(WDT_A_BASE);
     SFR_clearInterrupt(SFR_WATCHDOG_INTERVAL_TIMER_INTERRUPT);
     SFR_enableInterrupt(SFR_WATCHDOG_INTERVAL_TIMER_INTERRUPT);
@@ -226,9 +231,23 @@ __interrupt void WDT_A_ISR (void)
 {
     systemCounter++;
 
-    if(systemCounter == 3)
+    if((dfplayer.getInitStatus() == DFPL_UNINITIALIZED) && (systemCounter == 192))
     {
-        dfplayer.setVol(10);
+        dfplayer.setVol(DEFAULT_VOLUME);
+        dfplayer.setInitStatus(DFPL_INITIALIZED);
+        GPIO_setOutputHighOnPin(GPIO_PORT_LED2, GPIO_PIN_LED2);
+    }
+
+    if(serial.GetBufferLength() >= DFPL_MSG_LEN) {
+        uint8_t rxBuf[DFPL_MSG_LEN];
+        for(int i = 0; i < DFPL_MSG_LEN; i++) {
+            serial.SerialPortRead(rxBuf+i);
+        }
+        if(rxBuf[DFPL_POS_CMD] == DFPL_CMD_RESP_ONLINE) {
+            //GPIO_setOutputHighOnPin(GPIO_PORT_LED1, GPIO_PIN_LED1);
+            //dfplayer.setVol(DEFAULT_VOLUME);
+            //dfplayer.setInitStatus(DFPL_INITIALIZED);
+        }
     }
 }
 
@@ -282,4 +301,9 @@ void ButtonHornHandler(void)
         dfplayer.playAdvertisment();
         GPIO_clearInterrupt(BUTTON_HORN_PORT, BUTTON_HORN_PIN);
     }
+}
+
+void DataReceivedHandler(void)
+{
+    GPIO_setOutputHighOnPin(GPIO_PORT_LED1, GPIO_PIN_LED1);
 }
