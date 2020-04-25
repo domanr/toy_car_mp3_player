@@ -40,6 +40,8 @@ void Serial::init(void (*pULNotificationCallout)(void))
     UpperLayerCallout = pULNotificationCallout;
 
     EUSCI_A_UART_enable(EUSCI_A0_BASE);
+    EUSCI_A_UART_clearInterrupt(EUSCI_A0_BASE, EUSCI_A_UART_RECEIVE_INTERRUPT);
+    EUSCI_A_UART_enableInterrupt(EUSCI_A0_BASE, EUSCI_A_UART_RECEIVE_INTERRUPT);
 }
 
 void Serial::puts(char* input)
@@ -61,13 +63,6 @@ void Serial::send(char c)
 
 Serial::Serial(void) { }
 
-//******************************************************************************
-//
-//This is the USCI_A0 interrupt vector service routine.
-//
-//******************************************************************************
-#pragma vector=USCI_A0_VECTOR
-
 CbReadReturnType Serial::SerialPortRead(uint8_t* data)
 {
     if(ReadPosition == WritePosition)
@@ -85,6 +80,12 @@ uint8_t Serial::GetBufferLength(void)
     return((WritePosition - ReadPosition) & (BUFFER_SIZE-1));
 }
 
+//******************************************************************************
+//
+//This is the USCI_A0 interrupt vector service routine.
+//
+//******************************************************************************
+#pragma vector=USCI_A0_VECTOR
 __interrupt void Serial::EUSCI_A0_ISR(void)
 {
     switch(__even_in_range(UCA0IV,USCI_UART_UCTXCPTIFG))
