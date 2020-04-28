@@ -7,10 +7,11 @@
 
 #include <DFPlayer.h>
 
-DFPlayer::DFPlayer()
+DFPlayer::DFPlayer() :
+        PlayingStatus(DFPL_STATUS_PAUSED), initStatus(DFPL_UNINITIALIZED),
+        responseStatus(DFPL_RESPONSE_WAITING), responseAvailable(false),
+        respReadPos(0u), responseBuffer{}
 {
-    // TODO Auto-generated constructor stub
-
 }
 
 uint16_t DFPlayer::calculateCheckSum(char* buf)
@@ -53,11 +54,11 @@ void DFPlayer::next(void)
                                   DFPL_START_BYTE,
                                   DFPL_VERSION,
                                   DFPL_LEN, DFPL_CMD_NEXT,
-                                  DFPL_FEEDBACK_OFF,
+                                  DFPL_FEEDBACK_ON,
                                   DFPL_NO_DATA,
                                   DFPL_NO_DATA,
-                                  GET_HIGH_BYTE(DFPL_CMD_CS_NO_FEEDBACK_NO_DATA(DFPL_CMD_NEXT)),
-                                  GET_LOW_BYTE(DFPL_CMD_CS_NO_FEEDBACK_NO_DATA(DFPL_CMD_NEXT)),
+                                  GET_HIGH_BYTE(DFPL_CMD_CS_NO_DATA(DFPL_CMD_NEXT)),
+                                  GET_LOW_BYTE(DFPL_CMD_CS_NO_DATA(DFPL_CMD_NEXT)),
                                   DFPL_END_BYTE
     };
     sendMsg(message);
@@ -69,11 +70,11 @@ void DFPlayer::previous(void)
                                   DFPL_START_BYTE,
                                   DFPL_VERSION,
                                   DFPL_LEN, DFPL_CMD_PREV,
-                                  DFPL_FEEDBACK_OFF,
+                                  DFPL_FEEDBACK_ON,
                                   DFPL_NO_DATA,
                                   DFPL_NO_DATA,
-                                  GET_HIGH_BYTE(DFPL_CMD_CS_NO_FEEDBACK_NO_DATA(DFPL_CMD_PREV)),
-                                  GET_LOW_BYTE(DFPL_CMD_CS_NO_FEEDBACK_NO_DATA(DFPL_CMD_PREV)),
+                                  GET_HIGH_BYTE(DFPL_CMD_CS_NO_DATA(DFPL_CMD_PREV)),
+                                  GET_LOW_BYTE(DFPL_CMD_CS_NO_DATA(DFPL_CMD_PREV)),
                                   DFPL_END_BYTE
     };
     sendMsg(message);
@@ -166,7 +167,7 @@ void DFPlayer::setVol(uint8_t vol)
     sendMsg(message);
 }
 
-void DFPlayer::playAdvertisment(void)
+void DFPlayer::playAdvertisment(uint8_t advNo)
 {
     char message[DFPL_MSG_LEN] = {
             DFPL_START_BYTE,
@@ -174,9 +175,9 @@ void DFPlayer::playAdvertisment(void)
             DFPL_LEN, DFPL_CMD_PLAY_ADV,
             DFPL_FEEDBACK_OFF,
             DFPL_NO_DATA,
-            0x01,
-            GET_HIGH_BYTE(DFPL_CMD_CS_NO_FEEDBACK(DFPL_CMD_PLAY_ADV, 0x01)),
-            GET_LOW_BYTE(DFPL_CMD_CS_NO_FEEDBACK(DFPL_CMD_PLAY_ADV, 0x01)),
+            advNo,
+            GET_HIGH_BYTE(DFPL_CMD_CS_NO_FEEDBACK(DFPL_CMD_PLAY_ADV, advNo)),
+            GET_LOW_BYTE(DFPL_CMD_CS_NO_FEEDBACK(DFPL_CMD_PLAY_ADV, advNo)),
             DFPL_END_BYTE };
     sendMsg(message);
 }
@@ -201,6 +202,11 @@ void DFPlayer::setResponseStatus(ResponseStatus_t status)
     this->responseStatus = status;
 }
 
+uint8_t DFPlayer::readRespCommand()
+{
+    return responseBuffer[DFPL_POS_CMD];
+}
+
 void DFPlayer::startup(void)
 {
     char message[DFPL_MSG_LEN] = {
@@ -214,4 +220,21 @@ void DFPlayer::startup(void)
             GET_LOW_BYTE(DFPL_CMD_CS_NO_FEEDBACK(DFPL_CMD_PLAY_ADV, 0x02)),
             DFPL_END_BYTE };
     sendMsg(message);
+}
+
+bool DFPlayer::checkResponse()
+{
+    while((serial->GetBufferLength() > 0u) && (respReadPos < DFPL_MSG_LEN))
+    {
+        serial->SerialPortRead(responseBuffer + respReadPos);
+        if(((DFPL_POS_START == respReadPos) && (DFPL_START_BYTE == responseBuffer[respReadPos])) || (DFPL_POS_START < respReadPos)) {
+            respReadPos++;
+        }
+    }
+    if(DFPL_MSG_LEN == respReadPos) {
+        respReadPos = 0u;   // A complete message was received, reset the response position pointer
+        return true;
+    } else {
+        return false;       // Message reception was not completed, will be continued in the next loop
+    }
 }

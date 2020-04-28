@@ -93,7 +93,10 @@
 #define BUTTON_HORN_PORT        GPIO_PORT_P1
 #define BUTTON_HORN_PIN         GPIO_PIN3
 
-#define DEFAULT_VOLUME          15
+#define GAS_PEDAL_PORT          GPIO_PORT_P2
+#define GAS_PEDAL_PIN           GPIO_PIN2
+
+#define DEFAULT_VOLUME          18
 
 void WDT_Init(void);
 void Clock_Init(void);
@@ -105,6 +108,7 @@ void ButtonLeftHandler(void);
 void ButtonRightHandler(void);
 void ButtonMusicHandler(void);
 void ButtonHornHandler(void);
+void GasPedalHandler(void);
 
 void DataReceivedHandler(void);
 
@@ -118,7 +122,6 @@ void main(void)
     WDT_Init();
     Clock_Init();
     GPIO_Init();
-
     /*
      * Disable the GPIO power-on default high-impedance mode to activate
      * previously configured port settings
@@ -189,6 +192,8 @@ void GPIO_Init(void)
 
     //Configure the volume down button
     ConfigureButton(BUTTON_VOL_DOWN_PORT, BUTTON_VOL_DOWN_PIN);
+
+    ConfigureButton(GAS_PEDAL_PORT, GAS_PEDAL_PIN);
 }
 
 void ConfigureButton(uint8_t port, uint16_t pin)
@@ -223,6 +228,7 @@ __interrupt void P2_ISR (void)
     ButtonVolDownHandler();
     ButtonMusicHandler();
     ButtonLeftHandler();
+    GasPedalHandler();
 }
 
 //Watchdog Timer interrupt service routine
@@ -231,22 +237,11 @@ __interrupt void WDT_A_ISR (void)
 {
     systemCounter++;
 
-    if((dfplayer.getInitStatus() == DFPL_UNINITIALIZED) && (systemCounter == 192))
-    {
-        dfplayer.setVol(DEFAULT_VOLUME);
-        dfplayer.setInitStatus(DFPL_INITIALIZED);
-        GPIO_setOutputHighOnPin(GPIO_PORT_LED2, GPIO_PIN_LED2);
-    }
-
-    if(serial.GetBufferLength() >= DFPL_MSG_LEN) {
-        uint8_t rxBuf[DFPL_MSG_LEN];
-        for(int i = 0; i < DFPL_MSG_LEN; i++) {
-            serial.SerialPortRead(rxBuf+i);
-        }
-        if(rxBuf[DFPL_POS_CMD] == DFPL_CMD_RESP_ONLINE) {
-            //GPIO_setOutputHighOnPin(GPIO_PORT_LED1, GPIO_PIN_LED1);
-            //dfplayer.setVol(DEFAULT_VOLUME);
-            //dfplayer.setInitStatus(DFPL_INITIALIZED);
+    if(dfplayer.checkResponse()) {
+        if(DFPL_CMD_RESP_ONLINE == dfplayer.readRespCommand()) {
+            GPIO_setOutputHighOnPin(GPIO_PORT_LED1, GPIO_PIN_LED1);
+            dfplayer.setVol(DEFAULT_VOLUME);
+            dfplayer.setInitStatus(DFPL_INITIALIZED);
         }
     }
 }
@@ -298,12 +293,17 @@ void ButtonMusicHandler(void)
 void ButtonHornHandler(void)
 {
     if (GPIO_getInterruptStatus (BUTTON_HORN_PORT, BUTTON_HORN_PIN)) {
-        dfplayer.playAdvertisment();
+        dfplayer.playAdvertisment(1);
         GPIO_clearInterrupt(BUTTON_HORN_PORT, BUTTON_HORN_PIN);
     }
 }
 
-void DataReceivedHandler(void)
+void GasPedalHandler(void)
 {
-    GPIO_setOutputHighOnPin(GPIO_PORT_LED1, GPIO_PIN_LED1);
+    if (GPIO_getInterruptStatus (GAS_PEDAL_PORT, GAS_PEDAL_PIN)) {
+            dfplayer.playAdvertisment(3);
+            GPIO_clearInterrupt(GAS_PEDAL_PORT, GAS_PEDAL_PIN);
+    }
 }
+
+void DataReceivedHandler(void) {}

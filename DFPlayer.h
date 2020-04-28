@@ -63,6 +63,7 @@ enum {
 #define GET_HIGH_BYTE(word) (uint8_t(((word) & 0xFF00) >> 8))
 #define GET_LOW_BYTE(word) (uint8_t((word) & 0x00FF))
 #define DFPL_CMD_CS_NO_FEEDBACK_NO_DATA(cmd) (0x10000 - (DFPL_VERSION + DFPL_LEN + (cmd)))
+#define DFPL_CMD_CS_NO_DATA(cmd) (0x10000 - (DFPL_VERSION + DFPL_LEN + DFPL_FEEDBACK_ON + (cmd)))
 #define DFPL_CMD_CS_NO_FEEDBACK(cmd, data) (0x10000 - (DFPL_VERSION + DFPL_LEN + (data) + (cmd)))
 
 typedef enum {
@@ -85,9 +86,12 @@ class DFPlayer
 {
 private:
     Serial * serial;
-    PlayingStatus_t PlayingStatus = DFPL_STATUS_PAUSED;
-    Init_t initStatus = DFPL_UNINITIALIZED;
-    ResponseStatus_t responseStatus = DFPL_RESPONSE_WAITING;
+    PlayingStatus_t PlayingStatus;
+    Init_t initStatus;
+    ResponseStatus_t responseStatus;
+    bool responseAvailable;
+    uint8_t respReadPos;
+    uint8_t responseBuffer[DFPL_MSG_LEN];
     uint16_t calculateCheckSum(char* buf);
     void sendMsg(char* msg);
     void parseMsg(void);
@@ -100,6 +104,8 @@ public:
     void setInitStatus(Init_t status);
     ResponseStatus_t getResponseStatus() const;
     void setResponseStatus(ResponseStatus_t status);
+    bool checkResponse();
+    uint8_t readRespCommand();
 
     /* Commands */
     void next(void);
@@ -118,7 +124,7 @@ public:
     void specifyFolder(uint8_t folder);
     void volumeAdjustSet(uint8_t openVolAdj, uint8_t volGain);
     void repeatPlay(uint8_t repeatOnOff);
-    void playAdvertisment(void);
+    void playAdvertisment(uint8_t advNo);
     void startup(void);
 };
 
