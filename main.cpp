@@ -238,10 +238,39 @@ __interrupt void WDT_A_ISR (void)
     systemCounter++;
 
     if(dfplayer.checkResponse()) {
-        if(DFPL_CMD_RESP_ONLINE == dfplayer.readRespCommand()) {
-            GPIO_setOutputHighOnPin(GPIO_PORT_LED1, GPIO_PIN_LED1);
+        uint8_t response;
+        response = dfplayer.readRespCommand();
+        switch(response)
+        {
+        case DFPL_CMD_RESP_ONLINE:
             dfplayer.setVol(DEFAULT_VOLUME);
-            dfplayer.setInitStatus(DFPL_INITIALIZED);
+            break;
+        case DFPL_CMD_RESP_FEEDBACK:
+            if(DFPL_CMD_SET_VOL == dfplayer.getLastSentCmd()) {
+                /* Automatic start after power-up */
+                dfplayer.next();
+            }
+            break;
+        case DFPL_CMD_RESP_FINISHED_USB:
+        case DFPL_CMD_RESP_FINISHED_SD:
+            dfplayer.setPlayingStatus(DFPL_STATUS_PAUSED);
+            break;
+        default:
+            break;
+        }
+    }
+
+    if(dfplayer.getPlayingStatus() == DFPL_STATUS_PLAYING) {
+        GPIO_setOutputHighOnPin(GPIO_PORT_LED1, GPIO_PIN_LED1);
+    } else {
+        GPIO_setOutputLowOnPin(GPIO_PORT_LED1, GPIO_PIN_LED1);
+    }
+
+    /* Reset the counter every 60 sec */
+    if(systemCounter == (64 * 60)) {
+        systemCounter = 0;
+        if(dfplayer.getPlayingStatus() == DFPL_STATUS_PAUSED) {
+            dfplayer.next();
         }
     }
 }
@@ -277,11 +306,9 @@ void ButtonMusicHandler(void)
         {
         case DFPL_STATUS_PAUSED:
             dfplayer.play();
-            dfplayer.setPlayingStatus(DFPL_STATUS_PLAYING);
             break;
         case DFPL_STATUS_PLAYING:
             dfplayer.pause();
-            dfplayer.setPlayingStatus(DFPL_STATUS_PAUSED);
             break;
         default:
             break;

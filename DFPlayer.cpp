@@ -8,8 +8,7 @@
 #include <DFPlayer.h>
 
 DFPlayer::DFPlayer() :
-        PlayingStatus(DFPL_STATUS_PAUSED), initStatus(DFPL_UNINITIALIZED),
-        responseStatus(DFPL_RESPONSE_WAITING), responseAvailable(false),
+        PlayingStatus(DFPL_STATUS_PAUSED), lastSentCmd(DFPL_CMD_NO_CMD),
         respReadPos(0u), responseBuffer{}
 {
 }
@@ -42,6 +41,7 @@ PlayingStatus_t DFPlayer::getPlayingStatus()
 void DFPlayer::sendMsg(char* msg)
 {
     int i = 0;
+    lastSentCmd = msg[DFPL_POS_CMD];
     for(i = 0; i < DFPL_MSG_LEN; i++)
     {
         serial->send(msg[i]);
@@ -62,6 +62,7 @@ void DFPlayer::next(void)
                                   DFPL_END_BYTE
     };
     sendMsg(message);
+    setPlayingStatus(DFPL_STATUS_PLAYING);
 }
 
 void DFPlayer::previous(void)
@@ -78,6 +79,7 @@ void DFPlayer::previous(void)
                                   DFPL_END_BYTE
     };
     sendMsg(message);
+    setPlayingStatus(DFPL_STATUS_PLAYING);
 }
 
 void DFPlayer::increaseVol(void)
@@ -126,6 +128,7 @@ void DFPlayer::play(void)
             DFPL_END_BYTE
     };
     sendMsg(message);
+    setPlayingStatus(DFPL_STATUS_PLAYING);
 }
 
 void DFPlayer::pause(void)
@@ -142,6 +145,7 @@ void DFPlayer::pause(void)
             DFPL_END_BYTE
     };
     sendMsg(message);
+    setPlayingStatus(DFPL_STATUS_PAUSED);
 }
 
 void DFPlayer::setVol(uint8_t vol)
@@ -151,7 +155,7 @@ void DFPlayer::setVol(uint8_t vol)
             DFPL_VERSION,
             DFPL_LEN,
             DFPL_CMD_SET_VOL,
-            DFPL_FEEDBACK_OFF,
+            DFPL_FEEDBACK_ON,
             DFPL_NO_DATA,
             0,
             0,
@@ -182,29 +186,14 @@ void DFPlayer::playAdvertisment(uint8_t advNo)
     sendMsg(message);
 }
 
-Init_t DFPlayer::getInitStatus() const
-{
-    return initStatus;
-}
-
-void DFPlayer::setInitStatus(Init_t status)
-{
-    this->initStatus = status;
-}
-
-ResponseStatus_t DFPlayer::getResponseStatus() const
-{
-    return responseStatus;
-}
-
-void DFPlayer::setResponseStatus(ResponseStatus_t status)
-{
-    this->responseStatus = status;
-}
-
 uint8_t DFPlayer::readRespCommand()
 {
     return responseBuffer[DFPL_POS_CMD];
+}
+
+uint8_t DFPlayer::getLastSentCmd() const
+{
+    return lastSentCmd;
 }
 
 void DFPlayer::startup(void)

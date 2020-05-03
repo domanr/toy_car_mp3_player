@@ -22,7 +22,11 @@
 #define DFPL_NO_DATA        0x00
 #define DFPL_END_BYTE       0xEF
 
-#define DFPL_CMD_RESP_ONLINE    0x3F
+#define DFPL_CMD_RESP_FINISHED_USB  0x3C
+#define DFPL_CMD_RESP_FINISHED_SD   0x3D
+#define DFPL_CMD_RESP_ONLINE        0x3F
+#define DFPL_CMD_RESP_FEEDBACK      0x41
+#define DFPL_CMD_RESP_STATUS        0x42
 
 enum {
     DFPL_POS_START = 0,
@@ -38,6 +42,7 @@ enum {
 };
 
 enum {
+    DFPL_CMD_NO_CMD = 0u,
     DFPL_CMD_NEXT = 1u,
     DFPL_CMD_PREV,
     DFPL_CMD_TRACK_NUM,
@@ -58,7 +63,9 @@ enum {
     DFPL_CMD_PLAY_FOLDER_TRACK,
     DFPL_CMD_PLAY_ADV,
     DFPL_CMD_PLAY_FOLDER_TRACK_16,
-    DFPL_CMD_STOP_ADV
+    DFPL_CMD_STOP_ADV,
+    DFPL_CMD_STOP,
+    DFPL_CMD_REPEAT_PLAY_FOLDER
 };
 #define GET_HIGH_BYTE(word) (uint8_t(((word) & 0xFF00) >> 8))
 #define GET_LOW_BYTE(word) (uint8_t((word) & 0x00FF))
@@ -71,25 +78,12 @@ typedef enum {
     DFPL_STATUS_PAUSED
 } PlayingStatus_t;
 
-typedef enum {
-    DFPL_UNINITIALIZED,
-    DFPL_INITIALIZED
-} Init_t;
-
-typedef enum {
-    DFPL_RESPONSE_INITIATED,
-    DFPL_RESPONSE_PARSING,
-    DFPL_RESPONSE_WAITING
-} ResponseStatus_t;
-
 class DFPlayer
 {
 private:
     Serial * serial;
     PlayingStatus_t PlayingStatus;
-    Init_t initStatus;
-    ResponseStatus_t responseStatus;
-    bool responseAvailable;
+    uint8_t lastSentCmd;
     uint8_t respReadPos;
     uint8_t responseBuffer[DFPL_MSG_LEN];
     uint16_t calculateCheckSum(char* buf);
@@ -100,10 +94,6 @@ public:
     void setSerial(Serial &s);
     void setPlayingStatus(PlayingStatus_t p);
     PlayingStatus_t getPlayingStatus(void);
-    Init_t getInitStatus() const;
-    void setInitStatus(Init_t status);
-    ResponseStatus_t getResponseStatus() const;
-    void setResponseStatus(ResponseStatus_t status);
     bool checkResponse();
     uint8_t readRespCommand();
 
@@ -126,6 +116,7 @@ public:
     void repeatPlay(uint8_t repeatOnOff);
     void playAdvertisment(uint8_t advNo);
     void startup(void);
+    uint8_t getLastSentCmd() const;
 };
 
 #endif /* DFPLAYER_H_ */
