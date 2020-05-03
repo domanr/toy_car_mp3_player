@@ -67,11 +67,6 @@ enum {
     DFPL_CMD_STOP,
     DFPL_CMD_REPEAT_PLAY_FOLDER
 };
-#define GET_HIGH_BYTE(word) (uint8_t(((word) & 0xFF00) >> 8))
-#define GET_LOW_BYTE(word) (uint8_t((word) & 0x00FF))
-#define DFPL_CMD_CS_NO_FEEDBACK_NO_DATA(cmd) (0x10000 - (DFPL_VERSION + DFPL_LEN + (cmd)))
-#define DFPL_CMD_CS_NO_DATA(cmd) (0x10000 - (DFPL_VERSION + DFPL_LEN + DFPL_FEEDBACK_ON + (cmd)))
-#define DFPL_CMD_CS_NO_FEEDBACK(cmd, data) (0x10000 - (DFPL_VERSION + DFPL_LEN + (data) + (cmd)))
 
 typedef enum {
     DFPL_STATUS_PLAYING,
@@ -86,9 +81,15 @@ private:
     uint8_t lastSentCmd;
     uint8_t respReadPos;
     uint8_t responseBuffer[DFPL_MSG_LEN];
-    uint16_t calculateCheckSum(char* buf);
-    void sendMsg(char* msg);
-    void parseMsg(void);
+    uint8_t requestBuffer[DFPL_MSG_LEN];
+    void setCommand(uint8_t cmd);
+    void setData(uint16_t data);
+    void setData1(uint8_t data);
+    void setData2(uint8_t data);
+    void calculateCheckSum(void);
+    void sendMsg(uint8_t requestFeedback);
+    uint8_t getHighByte(uint16_t word);
+    uint8_t getLowByte(uint16_t word);
 public:
     DFPlayer();
     void setSerial(Serial &s);
@@ -115,7 +116,6 @@ public:
     void volumeAdjustSet(uint8_t openVolAdj, uint8_t volGain);
     void repeatPlay(uint8_t repeatOnOff);
     void playAdvertisment(uint8_t advNo);
-    void startup(void);
     uint8_t getLastSentCmd() const;
 };
 

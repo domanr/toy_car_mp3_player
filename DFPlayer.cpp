@@ -9,18 +9,42 @@
 
 DFPlayer::DFPlayer() :
         PlayingStatus(DFPL_STATUS_PAUSED), lastSentCmd(DFPL_CMD_NO_CMD),
-        respReadPos(0u), responseBuffer{}
+        respReadPos(0u), responseBuffer{},
+        requestBuffer{
+            DFPL_START_BYTE,
+            DFPL_VERSION,
+            DFPL_LEN,
+            DFPL_CMD_NO_CMD,
+            DFPL_FEEDBACK_OFF,
+            DFPL_NO_DATA,
+            DFPL_NO_DATA,
+            0u,
+            0u,
+            DFPL_END_BYTE
+        }
 {
 }
 
-uint16_t DFPlayer::calculateCheckSum(char* buf)
+void DFPlayer::calculateCheckSum()
 {
     uint16_t sum = 0;
     for(uint8_t i = 1; i < DFPL_CS_CALC_LEN; i++)
     {
-        sum += buf[i];
+        sum += requestBuffer[i];
     }
-    return -sum;
+    sum = (-sum);
+    requestBuffer[DFPL_POS_CS_HIGH] = getHighByte(sum);
+    requestBuffer[DFPL_POS_CS_LOW] = getLowByte(sum);
+}
+
+uint8_t DFPlayer::getHighByte(uint16_t word)
+{
+    return (uint8_t)((word & 0xFF00) >> 8);
+}
+
+uint8_t DFPlayer::getLowByte(uint16_t word)
+{
+    return (uint8_t)(word & 0x00FF);
 }
 
 void DFPlayer::setSerial(Serial &s)
@@ -38,152 +62,86 @@ PlayingStatus_t DFPlayer::getPlayingStatus()
     return PlayingStatus;
 }
 
-void DFPlayer::sendMsg(char* msg)
+void DFPlayer::sendMsg(uint8_t requestFeedback)
 {
     int i = 0;
-    lastSentCmd = msg[DFPL_POS_CMD];
+    requestBuffer[DFPL_POS_FEEDBACK] = requestFeedback;
+    calculateCheckSum();
+    lastSentCmd = requestBuffer[DFPL_POS_CMD];
     for(i = 0; i < DFPL_MSG_LEN; i++)
     {
-        serial->send(msg[i]);
+        serial->send(requestBuffer[i]);
     }
 }
 
 void DFPlayer::next(void)
 {
-    char message[DFPL_MSG_LEN] = {
-                                  DFPL_START_BYTE,
-                                  DFPL_VERSION,
-                                  DFPL_LEN, DFPL_CMD_NEXT,
-                                  DFPL_FEEDBACK_ON,
-                                  DFPL_NO_DATA,
-                                  DFPL_NO_DATA,
-                                  GET_HIGH_BYTE(DFPL_CMD_CS_NO_DATA(DFPL_CMD_NEXT)),
-                                  GET_LOW_BYTE(DFPL_CMD_CS_NO_DATA(DFPL_CMD_NEXT)),
-                                  DFPL_END_BYTE
-    };
-    sendMsg(message);
+    setCommand(DFPL_CMD_NEXT);
+    setData1(DFPL_NO_DATA);
+    setData2(DFPL_NO_DATA);
+    sendMsg(DFPL_FEEDBACK_ON);
     setPlayingStatus(DFPL_STATUS_PLAYING);
 }
 
 void DFPlayer::previous(void)
 {
-    char message[DFPL_MSG_LEN] = {
-                                  DFPL_START_BYTE,
-                                  DFPL_VERSION,
-                                  DFPL_LEN, DFPL_CMD_PREV,
-                                  DFPL_FEEDBACK_ON,
-                                  DFPL_NO_DATA,
-                                  DFPL_NO_DATA,
-                                  GET_HIGH_BYTE(DFPL_CMD_CS_NO_DATA(DFPL_CMD_PREV)),
-                                  GET_LOW_BYTE(DFPL_CMD_CS_NO_DATA(DFPL_CMD_PREV)),
-                                  DFPL_END_BYTE
-    };
-    sendMsg(message);
+    setCommand(DFPL_CMD_PREV);
+    setData1(DFPL_NO_DATA);
+    setData2(DFPL_NO_DATA);
+    sendMsg(DFPL_FEEDBACK_ON);
     setPlayingStatus(DFPL_STATUS_PLAYING);
 }
 
 void DFPlayer::increaseVol(void)
 {
-    char message[DFPL_MSG_LEN] = {
-                                  DFPL_START_BYTE,
-                                  DFPL_VERSION,
-                                  DFPL_LEN, DFPL_CMD_INC_VOL,
-                                  DFPL_FEEDBACK_OFF,
-                                  DFPL_NO_DATA,
-                                  DFPL_NO_DATA,
-                                  GET_HIGH_BYTE(DFPL_CMD_CS_NO_FEEDBACK_NO_DATA(DFPL_CMD_INC_VOL)),
-                                  GET_LOW_BYTE(DFPL_CMD_CS_NO_FEEDBACK_NO_DATA(DFPL_CMD_INC_VOL)),
-                                  DFPL_END_BYTE
-    };
-    sendMsg(message);
+    setCommand(DFPL_CMD_INC_VOL);
+    setData1(DFPL_NO_DATA);
+    setData2(DFPL_NO_DATA);
+    sendMsg(DFPL_FEEDBACK_OFF);
 }
 
 void DFPlayer::decreaseVol(void)
 {
-    char message[DFPL_MSG_LEN] = {
-                                  DFPL_START_BYTE,
-                                  DFPL_VERSION,
-                                  DFPL_LEN, DFPL_CMD_DEC_VOL,
-                                  DFPL_FEEDBACK_OFF,
-                                  DFPL_NO_DATA,
-                                  DFPL_NO_DATA,
-                                  GET_HIGH_BYTE(DFPL_CMD_CS_NO_FEEDBACK_NO_DATA(DFPL_CMD_DEC_VOL)),
-                                  GET_LOW_BYTE(DFPL_CMD_CS_NO_FEEDBACK_NO_DATA(DFPL_CMD_DEC_VOL)),
-                                  DFPL_END_BYTE
-    };
-    sendMsg(message);
+    setCommand(DFPL_CMD_DEC_VOL);
+    setData1(DFPL_NO_DATA);
+    setData2(DFPL_NO_DATA);
+    sendMsg(DFPL_FEEDBACK_OFF);
 }
 
 void DFPlayer::play(void)
 {
-    char message[DFPL_MSG_LEN] = {
-            DFPL_START_BYTE,
-            DFPL_VERSION,
-            DFPL_LEN, DFPL_CMD_PLAY,
-            DFPL_FEEDBACK_OFF,
-            DFPL_NO_DATA,
-            DFPL_NO_DATA,
-            GET_HIGH_BYTE(DFPL_CMD_CS_NO_FEEDBACK_NO_DATA(DFPL_CMD_PLAY)),
-            GET_LOW_BYTE(DFPL_CMD_CS_NO_FEEDBACK_NO_DATA(DFPL_CMD_PLAY)),
-            DFPL_END_BYTE
-    };
-    sendMsg(message);
+    setCommand(DFPL_CMD_PLAY);
+    setData1(DFPL_NO_DATA);
+    setData2(DFPL_NO_DATA);
+    sendMsg(DFPL_FEEDBACK_OFF);
     setPlayingStatus(DFPL_STATUS_PLAYING);
 }
 
 void DFPlayer::pause(void)
 {
-    char message[DFPL_MSG_LEN] = {
-            DFPL_START_BYTE,
-            DFPL_VERSION,
-            DFPL_LEN, DFPL_CMD_PAUSE,
-            DFPL_FEEDBACK_OFF,
-            DFPL_NO_DATA,
-            DFPL_NO_DATA,
-            GET_HIGH_BYTE(DFPL_CMD_CS_NO_FEEDBACK_NO_DATA(DFPL_CMD_PAUSE)),
-            GET_LOW_BYTE(DFPL_CMD_CS_NO_FEEDBACK_NO_DATA(DFPL_CMD_PAUSE)),
-            DFPL_END_BYTE
-    };
-    sendMsg(message);
+    setCommand(DFPL_CMD_PAUSE);
+    setData1(DFPL_NO_DATA);
+    setData2(DFPL_NO_DATA);
+    sendMsg(DFPL_FEEDBACK_OFF);
     setPlayingStatus(DFPL_STATUS_PAUSED);
 }
 
 void DFPlayer::setVol(uint8_t vol)
 {
-    char message[DFPL_MSG_LEN] = {
-            DFPL_START_BYTE,
-            DFPL_VERSION,
-            DFPL_LEN,
-            DFPL_CMD_SET_VOL,
-            DFPL_FEEDBACK_ON,
-            DFPL_NO_DATA,
-            0,
-            0,
-            0,
-            DFPL_END_BYTE
-    };
-    uint16_t cs;
-
-    message[DFPL_POS_DATA2] = vol;
-    cs = calculateCheckSum(message);
-    message[DFPL_POS_CS_HIGH] = GET_HIGH_BYTE(cs);
-    message[DFPL_POS_CS_LOW] = GET_LOW_BYTE(cs);
-    sendMsg(message);
+    setCommand(DFPL_CMD_SET_VOL);
+    setData1(DFPL_NO_DATA);
+    setData2(vol);
+    calculateCheckSum();
+    sendMsg(DFPL_FEEDBACK_ON);
 }
 
 void DFPlayer::playAdvertisment(uint8_t advNo)
 {
-    char message[DFPL_MSG_LEN] = {
-            DFPL_START_BYTE,
-            DFPL_VERSION,
-            DFPL_LEN, DFPL_CMD_PLAY_ADV,
-            DFPL_FEEDBACK_OFF,
-            DFPL_NO_DATA,
-            advNo,
-            GET_HIGH_BYTE(DFPL_CMD_CS_NO_FEEDBACK(DFPL_CMD_PLAY_ADV, advNo)),
-            GET_LOW_BYTE(DFPL_CMD_CS_NO_FEEDBACK(DFPL_CMD_PLAY_ADV, advNo)),
-            DFPL_END_BYTE };
-    sendMsg(message);
+    setCommand(DFPL_CMD_PLAY_ADV);
+    setData1(DFPL_NO_DATA);
+    setData2(advNo);
+    calculateCheckSum();
+    sendMsg(DFPL_FEEDBACK_OFF);
 }
 
 uint8_t DFPlayer::readRespCommand()
@@ -191,24 +149,30 @@ uint8_t DFPlayer::readRespCommand()
     return responseBuffer[DFPL_POS_CMD];
 }
 
+void DFPlayer::setData(uint16_t data)
+{
+    requestBuffer[DFPL_POS_DATA1] = getHighByte(data);
+    requestBuffer[DFPL_POS_DATA2] = getLowByte(data);
+}
+
+void DFPlayer::setData1(uint8_t data)
+{
+    requestBuffer[DFPL_POS_DATA1] = data;
+}
+
+void DFPlayer::setData2(uint8_t data)
+{
+    requestBuffer[DFPL_POS_DATA2] = data;
+}
+
+void DFPlayer::setCommand(uint8_t cmd)
+{
+    requestBuffer[DFPL_POS_CMD] = cmd;
+}
+
 uint8_t DFPlayer::getLastSentCmd() const
 {
     return lastSentCmd;
-}
-
-void DFPlayer::startup(void)
-{
-    char message[DFPL_MSG_LEN] = {
-            DFPL_START_BYTE,
-            DFPL_VERSION,
-            DFPL_LEN, DFPL_CMD_PLAY_ADV,
-            DFPL_FEEDBACK_OFF,
-            DFPL_NO_DATA,
-            0x02,
-            GET_HIGH_BYTE(DFPL_CMD_CS_NO_FEEDBACK(DFPL_CMD_PLAY_ADV, 0x02)),
-            GET_LOW_BYTE(DFPL_CMD_CS_NO_FEEDBACK(DFPL_CMD_PLAY_ADV, 0x02)),
-            DFPL_END_BYTE };
-    sendMsg(message);
 }
 
 bool DFPlayer::checkResponse()
