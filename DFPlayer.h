@@ -1,8 +1,9 @@
-/*
- * DFPlayer.h
+/**
+ * @file    DFPlayer.h
+ * @author  Rajmund Doman (domanr@gmail.com)
  *
- *  Created on: Nov 23, 2019
- *      Author: doman
+ * @brief   Header of the DFPlayer class
+ *
  */
 
 #ifndef DFPLAYER_H_

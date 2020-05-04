@@ -1,8 +1,9 @@
-/*
- * Serial.h
+/**
+ * @file    Serial.cpp
+ * @author  Rajmund Doman (domanr@gmail.com)
  *
- *  Created on: Nov 3, 2019
- *      Author: DomanR
+ * @brief   Header of the serial port handler class
+ *
  */
 
 #ifndef SERIAL_H_

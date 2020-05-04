@@ -1,8 +1,9 @@
-/*
- * DFPlayer.cpp
+/**
+ * @file    DFPlayer.cpp
+ * @author  Rajmund Doman (domanr@gmail.com)
  *
- *  Created on: Nov 23, 2019
- *      Author: doman
+ * @brief   DFPlayer class
+ *
  */
 
 #include <DFPlayer.h>
