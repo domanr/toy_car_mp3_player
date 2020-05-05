@@ -61,8 +61,12 @@
 #define NOTIF_FOLDER            2
 /** @brief The ID of the first track */
 #define FIRST_TRACK             1
-/** @brief The ID of the first track */
-#define CYCLIC_NOTIF_TRACK      1
+/** @brief The ID of the horn sound */
+#define HORN_SOUND              1
+/** @brief The ID of the notification track */
+#define CYCLIC_NOTIF_TRACK      2
+/** @brief The ID of the throttle sound */
+#define THROTTLE_SOUND          3
 /** @brief Timeout of the state waiting for feedback from the DFPlayer. Unit: 15.625 ms */
 #define TIMEOUT_WAITING         64
 /** @brief The length of the LED error pattern. Unit: 15.625 ms */
@@ -322,7 +326,13 @@ void ButtonHornHandler(void)
 {
     if (GPIO_getInterruptStatus (BUTTON_HORN_PORT, BUTTON_HORN_PIN)) {
         if(initStatus == InitPhase::PHASE_4_READY_TO_PLAY) {
-            dfplayer.playAdvertisment(1);
+            if(dfplayer.getPlayingStatus() == DFPL_STATUS_PLAYING) {
+                dfplayer.playAdvertisment(HORN_SOUND);
+            } else {
+                // If the DFPlayer is not playing a track, it's not possible to insert an advertisement
+                // The same sound can be played in this case from the notification folder
+                dfplayer.playTrackInFolder(NOTIF_FOLDER, HORN_SOUND);
+            }
         } else {
             PlayLedErrorPattern();
         }
@@ -334,7 +344,13 @@ void GasPedalHandler(void)
 {
     if (GPIO_getInterruptStatus (GAS_PEDAL_PORT, GAS_PEDAL_PIN)) {
         if(initStatus == InitPhase::PHASE_4_READY_TO_PLAY) {
-            dfplayer.playAdvertisment(3);
+            if(dfplayer.getPlayingStatus() == DFPL_STATUS_PLAYING) {
+                dfplayer.playAdvertisment(THROTTLE_SOUND);
+            } else {
+                // If the DFPlayer is not playing a track, it's not possible to insert an advertisement
+                // The same sound can be played in this case from the notification folder
+                dfplayer.playTrackInFolder(NOTIF_FOLDER, THROTTLE_SOUND);
+            }
         } else {
             PlayLedErrorPattern();
         }
