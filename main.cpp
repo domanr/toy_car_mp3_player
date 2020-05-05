@@ -11,6 +11,11 @@
  * pressed. The corresponding sound effect is played, then the playback of the
  * song goes on.
  *
+ * Initialization sequence:
+ * Phase 1: waiting for online message from the DFPlayer
+ * Phase 2: when the DFPlayer is online, set the default volume
+ * Phase 3: when the volume is set, query the number of tracks
+ * Phase 4: when the number of tracks is known, start playing the first track
  */
 
 #include "driverlib.h"
@@ -50,6 +55,25 @@
 
 /** @brief The default volume which is set after startup */
 #define DEFAULT_VOLUME          18
+/** @brief The ID of the folder where the tracks are stored */
+#define MUSIC_FOLDER            1
+/** @brief The ID of the folder where the notification sounds are located */
+#define NOTIF_FOLDER            2
+/** @brief The ID of the first track */
+#define FIRST_TRACK             1
+/** @brief The ID of the first track */
+#define CYCLIC_NOTIF_TRACK      1
+/** @brief Timeout of the state waiting for feedback from the DFPlayer. Unit: 15.625 ms */
+#define TIMEOUT_WAITING         64
+/** @brief The length of the LED error pattern. Unit: 15.625 ms */
+#define ERROR_PATTERN_LENGTH    32
+
+enum class InitPhase {
+    PHASE_1_WAIT_FOR_ONLINE_FDBCK,
+    PHASE_2_WAIT_FOR_VOLUME_FDBCK,
+    PHASE_3_WAIT_FOR_TRACKNO_FDBCK,
+    PHASE_4_READY_TO_PLAY
+};
 
 void WDT_Init(void);
 void Clock_Init(void);
@@ -64,6 +88,9 @@ void ButtonHornHandler(void);
 void GasPedalHandler(void);
 
 void DataReceivedHandler(void);
+void InitStateMachine(void);
+void PlayLedErrorPattern(void);
+void LedHandler();
 
 /** @brief The serial port used for communication with the DFPlayer */
 Serial serial;
@@ -71,6 +98,16 @@ Serial serial;
 DFPlayer dfplayer;
 /** @brief The system counter is increased by a hardware time and used to trigger certain events */
 uint16_t systemCounter = 0;
+/** @brief Number of tracks on the SD card */
+uint8_t numberOfTracks = 0;
+/** @brief Current track */
+uint8_t currentTrack = 1;
+/** @brief Initialization status */
+InitPhase initStatus = InitPhase::PHASE_1_WAIT_FOR_ONLINE_FDBCK;
+/** @brief This flag is indicates if the LED error pattern is being played or not */
+bool indicatingError = false;
+/** @brief Number of the remaining loops of the LED error pattern play */
+uint8_t errorIndLoops = 0;
 
 void main(void)
 {
@@ -182,40 +219,37 @@ __interrupt void WDT_A_ISR (void)
 {
     systemCounter++;
 
-    if(dfplayer.checkResponse()) {
-        uint8_t response;
-        response = dfplayer.readRespCommand();
-        switch(response)
-        {
-        case DFPL_CMD_RESP_ONLINE:
-            dfplayer.setVol(DEFAULT_VOLUME);
-            break;
-        case DFPL_CMD_RESP_FEEDBACK:
-            if(DFPL_CMD_SET_VOL == dfplayer.getLastSentCmd()) {
-                // Automatic start after power-up
-                dfplayer.next();
+    if(initStatus == InitPhase::PHASE_4_READY_TO_PLAY) {
+        if(dfplayer.checkResponse()) {
+            uint8_t response;
+            response = dfplayer.readRespCommand();
+
+            switch(response)
+            {
+            case DFPL_CMD_RESP_FINISHED_USB:
+            case DFPL_CMD_RESP_FINISHED_SD:
+                dfplayer.setPlayingStatus(DFPL_STATUS_PAUSED);
+                break;
+            case DFPL_CMD_RESP_ERROR:
+                PlayLedErrorPattern();
+                GPIO_setOutputLowOnPin(GPIO_PORT_LED1, GPIO_PIN_LED1);
+                GPIO_setOutputHighOnPin(GPIO_PORT_LED2, GPIO_PIN_LED2);
+            default:
+                break;
             }
-            break;
-        case DFPL_CMD_RESP_FINISHED_USB:
-        case DFPL_CMD_RESP_FINISHED_SD:
-            dfplayer.setPlayingStatus(DFPL_STATUS_PAUSED);
-            break;
-        default:
-            break;
         }
+    } else {
+        InitStateMachine();
     }
 
-    if(dfplayer.getPlayingStatus() == DFPL_STATUS_PLAYING) {
-        GPIO_setOutputHighOnPin(GPIO_PORT_LED1, GPIO_PIN_LED1);
-    } else {
-        GPIO_setOutputLowOnPin(GPIO_PORT_LED1, GPIO_PIN_LED1);
-    }
+    LedHandler();
 
     // Reset the counter every 60 sec
     if(systemCounter == (64 * 60)) {
         systemCounter = 0;
+        // Warning message: the toy car is left turned on
         if(dfplayer.getPlayingStatus() == DFPL_STATUS_PAUSED) {
-            dfplayer.next();
+            dfplayer.playTrackInFolder(NOTIF_FOLDER, CYCLIC_NOTIF_TRACK);
         }
     }
 }
@@ -231,7 +265,16 @@ void ButtonVolDownHandler(void)
 void ButtonLeftHandler(void)
 {
     if (GPIO_getInterruptStatus (BUTTON_LEFT_PORT, BUTTON_LEFT_PIN)) {
-        dfplayer.previous();
+        if(initStatus == InitPhase::PHASE_4_READY_TO_PLAY) {
+            currentTrack--;
+            // Check if reached the first track
+            if(currentTrack < FIRST_TRACK) {
+                currentTrack = numberOfTracks;
+            }
+            dfplayer.playTrackInFolder(MUSIC_FOLDER, currentTrack);
+        } else {
+            PlayLedErrorPattern();
+        }
         GPIO_clearInterrupt(BUTTON_LEFT_PORT, BUTTON_LEFT_PIN);
     }
 }
@@ -239,7 +282,16 @@ void ButtonLeftHandler(void)
 void ButtonRightHandler(void)
 {
     if (GPIO_getInterruptStatus (BUTTON_RIGHT_PORT, BUTTON_RIGHT_PIN)) {
-        dfplayer.next();
+        if(initStatus == InitPhase::PHASE_4_READY_TO_PLAY) {
+            currentTrack++;
+            // Check if reached the last track
+            if(currentTrack > numberOfTracks) {
+                currentTrack = FIRST_TRACK;
+            }
+            dfplayer.playTrackInFolder(MUSIC_FOLDER, currentTrack);
+        } else {
+            PlayLedErrorPattern();
+        }
         GPIO_clearInterrupt(BUTTON_RIGHT_PORT, BUTTON_RIGHT_PIN);
     }
 }
@@ -247,16 +299,20 @@ void ButtonRightHandler(void)
 void ButtonMusicHandler(void)
 {
     if (GPIO_getInterruptStatus (BUTTON_MUSIC_PORT, BUTTON_MUSIC_PIN)) {
-        switch(dfplayer.getPlayingStatus())
-        {
-        case DFPL_STATUS_PAUSED:
-            dfplayer.play();
-            break;
-        case DFPL_STATUS_PLAYING:
-            dfplayer.pause();
-            break;
-        default:
-            break;
+        if(initStatus == InitPhase::PHASE_4_READY_TO_PLAY) {
+            switch(dfplayer.getPlayingStatus())
+            {
+            case DFPL_STATUS_PAUSED:
+                dfplayer.play();
+                break;
+            case DFPL_STATUS_PLAYING:
+                dfplayer.pause();
+                break;
+            default:
+                break;
+            }
+        } else {
+            PlayLedErrorPattern();
         }
         GPIO_clearInterrupt(BUTTON_MUSIC_PORT, BUTTON_MUSIC_PIN);
     }
@@ -265,7 +321,11 @@ void ButtonMusicHandler(void)
 void ButtonHornHandler(void)
 {
     if (GPIO_getInterruptStatus (BUTTON_HORN_PORT, BUTTON_HORN_PIN)) {
-        dfplayer.playAdvertisment(1);
+        if(initStatus == InitPhase::PHASE_4_READY_TO_PLAY) {
+            dfplayer.playAdvertisment(1);
+        } else {
+            PlayLedErrorPattern();
+        }
         GPIO_clearInterrupt(BUTTON_HORN_PORT, BUTTON_HORN_PIN);
     }
 }
@@ -273,9 +333,107 @@ void ButtonHornHandler(void)
 void GasPedalHandler(void)
 {
     if (GPIO_getInterruptStatus (GAS_PEDAL_PORT, GAS_PEDAL_PIN)) {
+        if(initStatus == InitPhase::PHASE_4_READY_TO_PLAY) {
             dfplayer.playAdvertisment(3);
-            GPIO_clearInterrupt(GAS_PEDAL_PORT, GAS_PEDAL_PIN);
+        } else {
+            PlayLedErrorPattern();
+        }
+        GPIO_clearInterrupt(GAS_PEDAL_PORT, GAS_PEDAL_PIN);
     }
 }
 
 void DataReceivedHandler(void) {}
+
+void InitStateMachine(void)
+{
+    static uint16_t queryTime = 0;
+
+    switch(initStatus)
+    {
+    case InitPhase::PHASE_1_WAIT_FOR_ONLINE_FDBCK:
+        if(dfplayer.checkResponse() && (dfplayer.readRespCommand() == DFPL_CMD_RESP_ONLINE)) {
+            initStatus = InitPhase::PHASE_2_WAIT_FOR_VOLUME_FDBCK;
+            dfplayer.setVol(DEFAULT_VOLUME);
+            queryTime = systemCounter;
+        } else {
+            // No response or not the one we are waiting for
+            if(systemCounter >= TIMEOUT_WAITING) {
+                // Ping the DFPlayer
+                dfplayer.queryIsOnline();
+            } else {
+                // Keep waiting
+            }
+        }
+        break;
+    case InitPhase::PHASE_2_WAIT_FOR_VOLUME_FDBCK:
+        if(dfplayer.checkResponse() && (dfplayer.readRespCommand() == DFPL_CMD_RESP_FEEDBACK)) {
+            initStatus = InitPhase::PHASE_3_WAIT_FOR_TRACKNO_FDBCK;
+            dfplayer.queryNoOfTracks();
+            queryTime = systemCounter;
+        } else {
+            // Trying again after 1 second
+            if((systemCounter - queryTime) > TIMEOUT_WAITING) {
+                dfplayer.setVol(DEFAULT_VOLUME);
+                queryTime = systemCounter;
+            } else {
+                // Keep waiting
+            }
+        }
+        break;
+    case InitPhase::PHASE_3_WAIT_FOR_TRACKNO_FDBCK:
+        if(dfplayer.checkResponse() && (dfplayer.readRespCommand() == DFPL_CMD_Q_NO_OF_TRACKS)) {
+            initStatus = InitPhase::PHASE_4_READY_TO_PLAY;
+            numberOfTracks = dfplayer.readRespData2();
+        } else {
+            // Trying again after 1 second
+            if((systemCounter - queryTime) > TIMEOUT_WAITING) {
+                dfplayer.queryNoOfTracks();
+                queryTime = systemCounter;
+            } else {
+                // Keep waiting
+            }
+        }
+        break;
+    default:
+        break;
+    }
+}
+
+void PlayLedErrorPattern(void)
+{
+    indicatingError = true;
+    errorIndLoops = ERROR_PATTERN_LENGTH;
+}
+
+void LedHandler()
+{
+    if(indicatingError == false) {
+        if(initStatus == InitPhase::PHASE_4_READY_TO_PLAY) {
+            // LED1 follows the playing status
+            if(dfplayer.getPlayingStatus() == DFPL_STATUS_PLAYING) {
+                GPIO_setOutputHighOnPin(GPIO_PORT_LED1, GPIO_PIN_LED1);
+            } else {
+                GPIO_setOutputLowOnPin(GPIO_PORT_LED1, GPIO_PIN_LED1);
+            }
+            // LED2 shows the initialization status
+            GPIO_setOutputHighOnPin(GPIO_PORT_LED2, GPIO_PIN_LED2);
+        } else {
+            // Toggle LED2 while being initialized
+            if((systemCounter % 8) == 0) {
+                GPIO_toggleOutputOnPin(GPIO_PORT_LED2, GPIO_PIN_LED2);
+            }
+        }
+    } else {
+        // Play the error indication pattern
+        if(errorIndLoops > 0) {
+            if((systemCounter % 4) == 0) {
+                GPIO_toggleOutputOnPin(GPIO_PORT_LED1, GPIO_PIN_LED1);
+                GPIO_toggleOutputOnPin(GPIO_PORT_LED2, GPIO_PIN_LED2);
+            }
+            errorIndLoops--;
+        } else {
+            // The error indication is finished
+            indicatingError = false;
+        }
+    }
+}
