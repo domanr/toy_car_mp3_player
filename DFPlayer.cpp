@@ -150,6 +150,16 @@ uint8_t DFPlayer::readRespCommand()
     return responseBuffer[DFPL_POS_CMD];
 }
 
+uint8_t DFPlayer::readRespData1()
+{
+    return responseBuffer[DFPL_POS_DATA1];
+}
+
+uint8_t DFPlayer::readRespData2()
+{
+    return responseBuffer[DFPL_POS_DATA2];
+}
+
 void DFPlayer::setData(uint16_t data)
 {
     requestBuffer[DFPL_POS_DATA1] = getHighByte(data);
@@ -169,6 +179,33 @@ void DFPlayer::setData2(uint8_t data)
 void DFPlayer::setCommand(uint8_t cmd)
 {
     requestBuffer[DFPL_POS_CMD] = cmd;
+}
+
+void DFPlayer::queryNoOfTracks(void)
+{
+    setCommand(DFPL_CMD_Q_NO_OF_TRACKS);
+    setData1(DFPL_NO_DATA);
+    setData2(1);
+    calculateCheckSum();
+    sendMsg(DFPL_FEEDBACK_OFF);
+}
+void DFPlayer::queryIsOnline(void)
+{
+    setCommand(DFPL_CMD_Q_ONLINE);
+    setData1(DFPL_NO_DATA);
+    setData2(DFPL_NO_DATA);
+    calculateCheckSum();
+    sendMsg(DFPL_FEEDBACK_OFF);
+}
+
+void DFPlayer::playTrackInFolder(uint8_t folder, uint8_t track)
+{
+    setCommand(DFPL_CMD_FOLDER);
+    setData1(folder);
+    setData2(track);
+    calculateCheckSum();
+    sendMsg(DFPL_FEEDBACK_OFF);
+    setPlayingStatus(DFPL_STATUS_PLAYING);
 }
 
 uint8_t DFPlayer::getLastSentCmd() const

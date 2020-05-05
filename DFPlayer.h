@@ -26,8 +26,12 @@
 #define DFPL_CMD_RESP_FINISHED_USB  0x3C
 #define DFPL_CMD_RESP_FINISHED_SD   0x3D
 #define DFPL_CMD_RESP_ONLINE        0x3F
+#define DFPL_CMD_RESP_ERROR         0x40
 #define DFPL_CMD_RESP_FEEDBACK      0x41
 #define DFPL_CMD_RESP_STATUS        0x42
+
+#define DFPL_CMD_Q_NO_OF_TRACKS     0x4E
+#define DFPL_CMD_Q_ONLINE           0x3F
 
 enum {
     DFPL_POS_START = 0,
@@ -98,6 +102,8 @@ public:
     PlayingStatus_t getPlayingStatus(void);
     bool checkResponse();
     uint8_t readRespCommand();
+    uint8_t readRespData1();
+    uint8_t readRespData2();
 
     /* Commands */
     void next(void);
@@ -112,11 +118,14 @@ public:
     void normalWorking(void);
     void reset(void);
     void play(void);
+    void playTrackInFolder(uint8_t folder, uint8_t track);
     void pause(void);
     void specifyFolder(uint8_t folder);
     void volumeAdjustSet(uint8_t openVolAdj, uint8_t volGain);
     void repeatPlay(uint8_t repeatOnOff);
     void playAdvertisment(uint8_t advNo);
+    void queryNoOfTracks(void);
+    void queryIsOnline(void);
     uint8_t getLastSentCmd() const;
 };
 
