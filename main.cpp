@@ -54,7 +54,7 @@
 #define GAS_PEDAL_PIN           GPIO_PIN2
 
 /** @brief The default volume which is set after startup */
-#define DEFAULT_VOLUME          18
+#define DEFAULT_VOLUME          21
 /** @brief The ID of the folder where the tracks are stored */
 #define MUSIC_FOLDER            1
 /** @brief The ID of the folder where the notification sounds are located */
@@ -189,7 +189,7 @@ void ConfigureButton(uint8_t port, uint16_t pin)
 {
     GPIO_setAsInputPinWithPullUpResistor(port, pin);
     GPIO_enableInterrupt(port, pin);
-    GPIO_selectInterruptEdge(port, pin, GPIO_HIGH_TO_LOW_TRANSITION);
+    GPIO_selectInterruptEdge(port, pin, GPIO_LOW_TO_HIGH_TRANSITION);
     GPIO_clearInterrupt(port, pin);
 }
 
@@ -270,12 +270,16 @@ void ButtonLeftHandler(void)
 {
     if (GPIO_getInterruptStatus (BUTTON_LEFT_PORT, BUTTON_LEFT_PIN)) {
         if(initStatus == InitPhase::PHASE_4_READY_TO_PLAY) {
-            currentTrack--;
-            // Check if reached the first track
-            if(currentTrack < FIRST_TRACK) {
-                currentTrack = numberOfTracks;
+            if(GPIO_INPUT_PIN_LOW == GPIO_getInputPinValue(BUTTON_MUSIC_PORT, BUTTON_MUSIC_PIN)) {
+                dfplayer.decreaseVol();
+            } else {
+                currentTrack--;
+                // Check if reached the first track
+                if(currentTrack < FIRST_TRACK) {
+                    currentTrack = numberOfTracks;
+                }
+                dfplayer.playTrackInFolder(MUSIC_FOLDER, currentTrack);
             }
-            dfplayer.playTrackInFolder(MUSIC_FOLDER, currentTrack);
         } else {
             PlayLedErrorPattern();
         }
@@ -287,12 +291,16 @@ void ButtonRightHandler(void)
 {
     if (GPIO_getInterruptStatus (BUTTON_RIGHT_PORT, BUTTON_RIGHT_PIN)) {
         if(initStatus == InitPhase::PHASE_4_READY_TO_PLAY) {
-            currentTrack++;
-            // Check if reached the last track
-            if(currentTrack > numberOfTracks) {
-                currentTrack = FIRST_TRACK;
+            if(GPIO_INPUT_PIN_LOW == GPIO_getInputPinValue(BUTTON_MUSIC_PORT, BUTTON_MUSIC_PIN)) {
+                dfplayer.increaseVol();
+            } else {
+                currentTrack++;
+                // Check if reached the last track
+                if(currentTrack > numberOfTracks) {
+                    currentTrack = FIRST_TRACK;
+                }
+                dfplayer.playTrackInFolder(MUSIC_FOLDER, currentTrack);
             }
-            dfplayer.playTrackInFolder(MUSIC_FOLDER, currentTrack);
         } else {
             PlayLedErrorPattern();
         }
@@ -304,16 +312,20 @@ void ButtonMusicHandler(void)
 {
     if (GPIO_getInterruptStatus (BUTTON_MUSIC_PORT, BUTTON_MUSIC_PIN)) {
         if(initStatus == InitPhase::PHASE_4_READY_TO_PLAY) {
-            switch(dfplayer.getPlayingStatus())
-            {
-            case DFPL_STATUS_PAUSED:
-                dfplayer.play();
-                break;
-            case DFPL_STATUS_PLAYING:
-                dfplayer.pause();
-                break;
-            default:
-                break;
+            if((GPIO_INPUT_PIN_HIGH == GPIO_getInputPinValue(BUTTON_RIGHT_PORT, BUTTON_RIGHT_PIN))
+                    && (GPIO_INPUT_PIN_HIGH == GPIO_getInputPinValue(BUTTON_LEFT_PORT, BUTTON_LEFT_PIN))) {
+                //if neither the right arrow, not the left arrow is pressed
+                switch(dfplayer.getPlayingStatus())
+                {
+                case DFPL_STATUS_PAUSED:
+                    dfplayer.play();
+                    break;
+                case DFPL_STATUS_PLAYING:
+                    dfplayer.pause();
+                    break;
+                default:
+                    break;
+                }
             }
         } else {
             PlayLedErrorPattern();
